@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DM's Tactical Board</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1f;
+            --panel-color: #24242d;
+            --border-color: #383842;
+            --text-color: #e3e3e6;
+            --accent-color: #ff4a4a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* Upper Panel Structure */
+        header { background: var(--panel-color); border-bottom: 2px solid var(--border-color); padding: 10px 20px; display: flex; align-items: center; user-select: none; z-index: 10; gap: 15px; }
+        
+        .left-block { display: flex; align-items: center; gap: 10px; }
+        .center-block { display: flex; align-items: center; justify-content: center; flex: 1; gap: 10px; }
+        .right-block { width: 120px; text-align: right; font-size: 14px; color: #888; }
+
+        .system-btn { background: #32323d; border: 1px solid var(--border-color); color: var(--text-color); padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .system-btn:hover { background: #41414f; }
+        
+        .controls-group { display: flex; align-items: center; background: #111116; padding: 4px; border-radius: 6px; gap: 5px; }
+        .zoom-btn { background: #32323d; border: none; color: white; width: 30px; height: 30px; cursor: pointer; font-weight: bold; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+        .zoom-btn:hover { background: #41414f; }
+        .zoom-val { min-width: 50px; text-align: center; font-size: 13px; font-weight: bold; color: #aaa; }
+
+        .grid-toggle-btn { background: #32323d; border: 1px solid var(--border-color); color: #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; white-space: nowrap; }
+        .grid-toggle-btn.active { background: #2e5cb8; color: white; border-color: #4575d4; }
+        .grid-opacity-slider { width: 60px; cursor: pointer; accent-color: #2e5cb8; }
+
+        /* Modes Buttons */
+        .mode-container { position: relative; display: inline-block; }
+        .mode-btn { background: #32323d; border: 1px solid var(--border-color); color: #aaa; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .mode-btn:hover { background: #3d3d4a; color: white; }
+        .mode-btn.active { background: var(--accent-color); color: white; border-color: #ff6b6b; }
+
+        /* Drawing / Fog Menus */
+        .drawing-popup { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
+        .drawing-popup.show { display: block; }
+        .popup-title { font-size: 12px; font-weight: bold; color: #888; margin-bottom: 4px; margin-top: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .popup-title:first-child { margin-top: 0; }
+        
+        .color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 5px; }
+        .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.1s; display: inline-block; box-shadow: inset 0 0 4px rgba(0,0,0,0.5); }
+        .color-circle:hover { transform: scale(1.1); }
+        .color-circle.selected { border-color: #fff; transform: scale(1.1); box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+        .brush-preview-box { background: #14141a; border-radius: 6px; padding: 10px; display: flex; align-items: center; justify-content: center; height: 45px; overflow: hidden; }
+        .size-slider { width: 100%; cursor: pointer; accent-color: var(--accent-color); margin-top: 2px; }
+
+        /* Main Workspace */
+        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+        .sidebar { width: 320px; background: var(--panel-color); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; user-select: none; z-index: 5; }
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); background: #1b1b22; }
+        .tab-btn { flex: 1; padding: 12px; background: transparent; border: none; color: #888; cursor: pointer; text-align: center; font-weight: bold; }
+        .tab-btn.active { color: var(--text-color); border-bottom: 2px solid var(--accent-color); background: var(--panel-color); }
+        .tab-content { flex: 1; padding: 15px; overflow-y: auto; display: none; }
+        .tab-content.active { display: block; }
+
+        .tree-actions { margin-bottom: 15px; display: flex; gap: 5px; }
+        .tree-btn { flex: 1; padding: 6px; font-size: 12px; background: #32323d; border: none; color: white; border-radius: 4px; cursor: pointer; }
+        
+        .location-list { list-style: none; }
+        .tree-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; margin-bottom: 4px; background: #1b1b22; border-radius: 4px; cursor: pointer; border: 1px solid transparent; transition: 0.15s; }
+        .tree-item.folder-header { font-weight: bold; color: #ffd166; background: #262633; }
+        
+        .tree-item.folder-header.drag-over { background: #323247; border-color: #ffd166; box-shadow: 0 0 8px rgba(255, 209, 102, 0.3); }
+
+        .tree-item .delete-item { color: #ff4a4a; cursor: pointer; font-weight: bold; border: none; background: transparent; padding: 0 5px; font-size: 16px; line-height: 1; }
+        .tree-item .delete-item:hover { transform: scale(1.2); }
+        
+        .folder-container { margin-bottom: 5px; }
+        .folder-children { list-style: none; padding-left: 15px; margin-top: 4px; }
+        .folder-children.collapsed { display: none; }
+        .file-item { font-size: 13px; background: #14141a; color: #ccc; cursor: grab; }
+
+        .canvas-area { flex: 1; position: relative; background: #0d0d11; overflow: hidden; }
+        #game-canvas { width: 100%; height: 100%; display: block; }
+
+        /* Контекстные меню и двухуровневая структура */
+        .ctx-menu-list { position: absolute; background: #2a2a32; border: 1px solid #3f3f4a; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; display: none; z-index: 1000; list-style: none; padding: 5px 0; min-width: 160px; user-select: none; }
+        .ctx-menu-list li { padding: 8px 15px; cursor: pointer; font-size: 14px; color: var(--text-color); position: relative; display: flex; justify-content: space-between; align-items: center; }
+        .ctx-menu-list li:hover { background: #383842; }
+
+        .ctx-menu-list li .arrow { font-size: 10px; color: #888; }
+        
+        .ctx-submenu { position: absolute; top: 0; left: 100%; background: #2a2a32; border: 1px solid #3f3f4a; border-radius: 4px; padding: 5px 0; list-style: none; min-width: 150px; display: none; box-shadow: 4px 4px 10px rgba(0,0,0,0.5); }
+        .ctx-menu-list li:hover .ctx-submenu { display: block; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="left-block">
+            <button class="system-btn" onclick="saveAdventure()">💾 Сохранить</button>
+            <button class="system-btn" onclick="document.getElementById('load-file').click()">📂 Загрузить</button>
+            <input type="file" id="load-file" style="display:none" onchange="loadAdventure(event)" accept=".json">
+
+            <div class="controls-group">
+                <button class="grid-toggle-btn" id="grid-toggle" onclick="toggleGrid()">🌐 Сетка</button>
+                <input type="range" class="grid-opacity-slider" id="grid-opacity" min="5" max="100" value="40" oninput="changeGridOpacity(this.value)">
+                <button class="grid-toggle-btn" id="grid-color-toggle" onclick="toggleGridColor()">🎨 Белая</button>
+            </div>
+
+            <div class="controls-group">
+                <button class="zoom-btn" onclick="changeZoom(-0.1)">−</button>
+                <span class="zoom-val" id="zoom-text">100%</span>
+                <button class="zoom-btn" onclick="changeZoom(0.1)">＋</button>
+                <button class="zoom-btn" onclick="resetZoom()" style="width: auto; padding: 0 6px; font-size: 11px;">100%</button>
+                <button class="zoom-btn" onclick="toggleFullscreen()">📺</button>
+            </div>
+        </div>
+
+        <div class="center-block">
+            <div class="mode-container">
+                <button class="mode-btn active" id="btn-mode-move" onclick="setMode('move')">✋ Перемещение</button>
+            </div>
+            
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-draw" onclick="setMode('draw')">✏️ Рисование</button>
+                <div class="drawing-popup" id="drawing-menu">
+                    <div class="popup-title">Цвета</div>
+                    <div class="color-grid" id="brush-colors"></div>
+                    <div class="popup-title">Размер кисти</div>
+                    <div class="brush-preview-box">
+                        <canvas id="brush-preview" width="240" height="30"></canvas>
+                    </div>
+                    <input type="range" class="size-slider" id="brush-size" min="2" max="30" value="6" oninput="updateBrushSize(this.value)">
+                </div>
+            </div>
+
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-eraser" onclick="setMode('eraser')">🧽 Ластик</button>
+            </div>
+            
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-fog" onclick="setMode('fog')">🌫️ Туман</button>
+                <div class="drawing-popup" id="fog-menu-popup">
+                    <div class="popup-title">Цвет тумана</div>
+                    <div class="color-grid" id="fog-colors"></div>
+                    <div class="popup-title">Размер кисти тумана</div>
+                    <div class="brush-preview-box">
+                        <canvas id="fog-preview" width="240" height="30"></canvas>
+                    </div>
+                    <input type="range" class="size-slider" id="fog-size" min="10" max="300" value="60" oninput="updateFogSize(this.value)">
+                    <div class="popup-title" id="fog-opacity-text">Плотность (Сила): 100%</div>
+                    <input type="range" class="size-slider" id="fog-opacity-slider" min="10" max="100" value="100" oninput="updateFogOpacity(this.value)">
+                </div>
+            </div>
+        </div>
+
+        <div class="right-block">DM Screen</div>
+    </header>
+
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('locations', this)">📍 Локации</button>
+                <button class="tab-btn" onclick="switchTab('library', this)">📁 Библиотека</button>
+            </div>
+            <div id="tab-locations" class="tab-content active">
+                <div class="tree-actions"><button class="tree-btn" onclick="addLocation()">＋ Новая локация</button></div>
+                <ul class="location-list" id="location-list"></ul>
+            </div>
+            <div id="tab-library" class="tab-content">
+                <div class="tree-actions"><button class="tree-btn" onclick="createFolder()">📁 + Папка</button></div>
+                <ul class="file-tree-list" id="file-tree"></ul>
+            </div>
+        </aside>
+
+        <main class="canvas-area" id="drop-zone">
+            <canvas id="game-canvas"></canvas>
+        </main>
+    </div>
+
+    <ul class="ctx-menu-list" id="token-menu">
+        <li>
+            <span>📐 Размер</span>
+            <span class="arrow">▶</span>
+            <ul class="ctx-submenu">
+                <li onclick="resizeSelectedToken(0.5)">Крошечный (0.5x)</li>
+                <li onclick="resizeSelectedToken(1.0)">Средний (1x)</li>
+                <li onclick="resizeSelectedToken(2.0)">Большой (2x)</li>
+                <li onclick="resizeSelectedToken(3.0)">Огромный (3x)</li>
+                <li onclick="resizeSelectedToken(4.0)">Гигантский (4x)</li>
+            </ul>
+        </li>
+        <li onclick="deleteSelectedToken()" style="color: var(--accent-color);">❌ Удалить токен</li>
+    </ul>
+
+    <ul class="ctx-menu-list" id="fog-ctx-menu">
+        <li onclick="toggleFogVisibility()">👁️ Скрыть / Показать туман</li>
+        <li onclick="deleteSelectedFog()" style="color: var(--accent-color);">❌ Удалить зону тумана</li>
+    </ul>
+
+    <script>
+        // --- СТРУКТУРА ДАННЫХ ---
+        let adventureData = {
+            locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [] }],
+            currentLocationId: 1,
+            library: [
+                { id: 101, name: "Локации", type: 'folder', collapsed: false, children: [] },
+                { id: 102, name: "Токены NPC", type: 'folder', collapsed: false, children: [] }
+            ] 
+        };
+        
+        let currentMode = 'move';
+        let zoomLevel = 1.0;
+        let offsetX = 50, offsetY = 50;
+        const cellSize = 50; 
+        let isGridEnabled = false; 
+        let gridOpacity = 0.4;
+        let gridColor = 'white';
+        const rulerSize = 24;
+
+        let currentBrushColor = '#ff4a4a';
+        let currentBrushSize = 6;
+        let isDrawingNow = false;
+        let currentLine = null;
+        
+        let currentFogColor = '#000000';
+        let currentFogSize = 60;
+        let currentFogOpacity = 1.0;
+        let isDrawingFog = false;
+        let currentFogArea = null;
+
+        let menuTargetTokenIndex = null;
+        let menuTargetFogIndex = null;
+
+        const snippingColors = [
+            '#000000', '#ffffff', '#7f7f7f', '#a3a3a3', '#d6d6d6', '#ececec',
+            '#ff007f', '#ff4a4a', '#ff7f00', '#ffc107', '#ffeb3b', '#ffff8d',
+            '#aeea00', '#00e676', '#00b0ff', '#29b6f6', '#2979ff', '#651fff',
+            '#aa00ff', '#d500f9', '#f8bbd0', '#ffccbc', '#bcaaa4', '#8d6e63',
+            '#f48fb1', '#ffab91', '#ffe082', '#e6ee9c', '#81c784', '#4fc3f7',
+            '#7986cb', '#b39ddb', '#e0e0e0', '#a1887f', '#4e342e', '#212121'
+        ];
+
+        let imageCache = new Map();
+        let isDraggingToken = false, isPanningMap = false;
+        let draggedTokenIndex = null;
+        let startX, startY;
+
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const dropZone = document.getElementById('drop-zone');
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            drawCanvas();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function initMenus() {
+            const brushColorsGrid = document.getElementById('brush-colors');
+            brushColorsGrid.innerHTML = '';
+            snippingColors.forEach(color => {
+                const circle = document.createElement('div');
+                circle.className = 'color-circle' + (color === currentBrushColor ? ' selected' : '');
+                circle.style.backgroundColor = color;
+                circle.onclick = (e) => {
+                    e.stopPropagation();
+                    brushColorsGrid.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
+                    circle.classList.add('selected');
+                    currentBrushColor = color;
+                    renderBrushPreview();
+                };
+                brushColorsGrid.appendChild(circle);
+            });
+
+            const fogColorsGrid = document.getElementById('fog-colors');
+            fogColorsGrid.innerHTML = '';
+            snippingColors.forEach(color => {
+                const circle = document.createElement('div');
+                circle.className = 'color-circle' + (color === currentFogColor ? ' selected' : '');
+                circle.style.backgroundColor = color;
+                circle.onclick = (e) => {
+                    e.stopPropagation();
+                    fogColorsGrid.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
+                    circle.classList.add('selected');
+                    currentFogColor = color;
+                    renderFogPreview();
+                };
+                fogColorsGrid.appendChild(circle);
+            });
+
+            renderBrushPreview();
+            renderFogPreview();
+        }
+
+        function updateBrushSize(val) { currentBrushSize = parseInt(val); renderBrushPreview(); }
+        function renderBrushPreview() {
+            const pCanvas = document.getElementById('brush-preview'); const pCtx = pCanvas.getContext('2d');
+            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height); pCtx.beginPath();
+            pCtx.moveTo(20, pCanvas.height / 2); pCtx.bezierCurveTo(60, 5, 180, 55, 220, pCanvas.height / 2);
+            pCtx.strokeStyle = currentBrushColor; pCtx.lineWidth = Math.min(currentBrushSize, 20); pCtx.lineCap = 'round'; pCtx.stroke();
+        }
+
+        function updateFogSize(val) { currentFogSize = parseInt(val); renderFogPreview(); }
+        function updateFogOpacity(val) { 
+            currentFogOpacity = val / 100; 
+            document.getElementById('fog-opacity-text').innerText = `Плотность (Сила): ${val}%`;
+            renderFogPreview(); 
+        }
+        function renderFogPreview() {
+            const pCanvas = document.getElementById('fog-preview'); const pCtx = pCanvas.getContext('2d');
+            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height); pCtx.beginPath();
+            pCtx.moveTo(20, pCanvas.height / 2); pCtx.bezierCurveTo(60, 5, 180, 55, 220, pCanvas.height / 2);
+            pCtx.strokeStyle = currentFogColor;
+            pCtx.globalAlpha = currentFogOpacity;
+            pCtx.lineWidth = Math.max(4, Math.min(currentFogSize / 4, 25)); 
+            pCtx.lineCap = 'round'; pCtx.stroke();
+            pCtx.globalAlpha = 1.0;
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-mode-${mode}`);
+            if(activeBtn) activeBtn.classList.add('active');
+            document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
+            document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
+        }
+
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.mode-container')) {
+                if (currentMode !== 'draw') document.getElementById('drawing-menu').classList.remove('show');
+                if (currentMode !== 'fog') document.getElementById('fog-menu-popup').classList.remove('show');
+            }
+            document.getElementById('token-menu').style.display = 'none';
+            document.getElementById('fog-ctx-menu').style.display = 'none';
+        });
+
+        function toggleGrid() { isGridEnabled = !isGridEnabled; document.getElementById('grid-toggle').classList.toggle('active', isGridEnabled); drawCanvas(); }
+        function changeGridOpacity(val) { gridOpacity = val / 100; drawCanvas(); }
+        function toggleGridColor() {
+            gridColor = (gridColor === 'white') ? 'black' : 'white';
+            document.getElementById('grid-color-toggle').innerText = `🎨 ${gridColor === 'white' ? 'Белая' : 'Черная'}`;
+            drawCanvas();
+        }
+        function changeZoom(amount) { zoomLevel = Math.max(0.2, Math.min(5.0, zoomLevel + amount)); document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`; drawCanvas(); }
+        function resetZoom() { zoomLevel = 1.0; offsetX = 50; offsetY = 50; document.getElementById('zoom-text').innerText = "100%"; drawCanvas(); }
+        function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); }
+        function switchTab(tabName, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); btn.classList.add('active'); document.getElementById(`tab-${tabName}`).classList.add('active'); }
+
+        // --- УПРАВЛЕНИЕ ТОКЕНАМИ И МАСШТАБОМ ---
+        function resizeSelectedToken(multiplier) {
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (currentLoc && menuTargetTokenIndex !== null && currentLoc.tokens[menuTargetTokenIndex]) {
+                currentLoc.tokens[menuTargetTokenIndex].radius = 25 * multiplier;
+                drawCanvas();
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+            const mapX = (canvasX - offsetX) / zoomLevel;
+            const mapY = (canvasY - offsetY) / zoomLevel;
+
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (!currentLoc) return;
+
+            if (e.button === 1) {
+                isPanningMap = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY; canvas.style.cursor = 'grabbing'; return;
+            }
+
+            if (e.button === 0) {
+                if (currentMode === 'draw') {
+                    isDrawingNow = true;
+                    currentLine = { color: currentBrushColor, size: currentBrushSize, points: [{x: mapX, y: mapY}] };
+                    currentLoc.drawings.push(currentLine);
+                    return;
+                }
+                if (currentMode === 'fog') {
+                    isDrawingFog = true;
+                    currentFogArea = { id: Date.now(), hidden: false, color: currentFogColor, size: currentFogSize, opacity: currentFogOpacity, points: [{x: mapX, y: mapY}] };
+                    if (!currentLoc.fog) currentLoc.fog = [];
+                    currentLoc.fog.push(currentFogArea);
+                    return;
+                }
+                if (currentMode === 'eraser') {
+                    currentLoc.drawings = currentLoc.drawings.filter(line => !line.points.some(p => Math.hypot(p.x - mapX, p.y - mapY) < (line.size + 10) / zoomLevel));
+                    drawCanvas();
+                    return;
+                }
+                if (currentMode === 'move') {
+                    for (let i = currentLoc.tokens.length - 1; i >= 0; i--) {
+                        const t = currentLoc.tokens[i];
+                        if (Math.hypot(canvasX - (t.x * zoomLevel + offsetX), canvasY - (t.y * zoomLevel + offsetY)) <= t.radius * zoomLevel) {
+                            isDraggingToken = true; draggedTokenIndex = i; canvas.style.cursor = 'move'; return;
+                        }
+                    }
+                    isPanningMap = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY; canvas.style.cursor = 'grabbing';
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mapX = (e.clientX - rect.left - offsetX) / zoomLevel;
+            const mapY = (e.clientY - rect.top - offsetY) / zoomLevel;
+
+            if (isPanningMap) { offsetX = e.clientX - startX; offsetY = e.clientY - startY; drawCanvas(); return; }
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (!currentLoc) return;
+
+            if (currentMode === 'draw' && isDrawingNow && currentLine) { currentLine.points.push({x: mapX, y: mapY}); drawCanvas(); return; }
+            if (currentMode === 'fog' && isDrawingFog && currentFogArea) { currentFogArea.points.push({x: mapX, y: mapY}); drawCanvas(); return; }
+            if (isDraggingToken && draggedTokenIndex !== null && currentLoc.tokens[draggedTokenIndex]) {
+                currentLoc.tokens[draggedTokenIndex].x = mapX; currentLoc.tokens[draggedTokenIndex].y = mapY; drawCanvas();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDrawingNow = false; isDrawingFog = false; isPanningMap = false; isDraggingToken = false;
+            currentLine = null; currentFogArea = null; draggedTokenIndex = null; canvas.style.cursor = 'default';
+        });
+
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+            const mapX = (canvasX - offsetX) / zoomLevel;
+            const mapY = (canvasY - offsetY) / zoomLevel;
+            
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (!currentLoc) return;
+
+            document.getElementById('token-menu').style.display = 'none';
+            document.getElementById('fog-ctx-menu').style.display = 'none';
+
+            for (let i = currentLoc.tokens.length - 1; i >= 0; i--) {
+                const t = currentLoc.tokens[i];
+                if (Math.hypot(canvasX - (t.x * zoomLevel + offsetX), canvasY - (t.y * zoomLevel + offsetY)) <= t.radius * zoomLevel) {
+                    menuTargetTokenIndex = i;
+                    const menu = document.getElementById('token-menu');
+                    menu.style.display = 'block'; menu.style.left = `${e.pageX}px`; menu.style.top = `${e.pageY}px`;
+                    return;
+                }
+            }
+
+            if (currentLoc.fog) {
+                for (let i = currentLoc.fog.length - 1; i >= 0; i--) {
+                    const area = currentLoc.fog[i];
+                    if (area.points.some(p => Math.hypot(p.x - mapX, p.y - mapY) < (area.size / 2) / zoomLevel)) {
+                        menuTargetFogIndex = i;
+                        const menu = document.getElementById('fog-ctx-menu');
+                        menu.style.display = 'block'; menu.style.left = `${e.pageX}px`; menu.style.top = `${e.pageY}px`;
+                        return;
+                    }
+                }
+            }
+        });
+
+        function toggleFogVisibility() {
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (currentLoc && currentLoc.fog && menuTargetFogIndex !== null) { currentLoc.fog[menuTargetFogIndex].hidden = !currentLoc.fog[menuTargetFogIndex].hidden; drawCanvas(); }
+        }
+        function deleteSelectedFog() {
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (currentLoc && currentLoc.fog && menuTargetFogIndex !== null) { currentLoc.fog.splice(menuTargetFogIndex, 1); drawCanvas(); }
+        }
+        function deleteSelectedToken() {
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (currentLoc && menuTargetTokenIndex !== null) { currentLoc.tokens.splice(menuTargetTokenIndex, 1); drawCanvas(); }
+        }
+
+        // --- СЛОИ ОТРИСОВКИ ХОЛСТА ---
+        function drawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#0d0d11"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (!currentLoc) return;
+
+            let mapW = canvas.width; let mapH = canvas.height;
+
+            if (currentLoc.bgData) {
+                const cacheKey = `bg_${currentLoc.id}`;
+                const renderBackground = (imgObj) => {
+                    mapW = imgObj.width; mapH = imgObj.height;
+                    ctx.drawImage(imgObj, offsetX, offsetY, mapW * zoomLevel, mapH * zoomLevel);
+                    if (isGridEnabled) drawTacticalGrid(mapW, mapH);
+                    drawVectorDrawings(currentLoc.drawings);
+                    drawTokens(currentLoc.tokens);
+                    drawFogOfWar(currentLoc.fog);
+                    drawDynamicRulers(mapW, mapH);
+                };
+                if (imageCache.has(cacheKey)) { renderBackground(imageCache.get(cacheKey)); } 
+                else { const img = new Image(); img.src = currentLoc.bgData; img.onload = function() { imageCache.set(cacheKey, img); renderBackground(img); }; }
+            } else {
+                if (isGridEnabled) drawTacticalGrid(canvas.width, canvas.height);
+                drawVectorDrawings(currentLoc.drawings);
+                drawTokens(currentLoc.tokens);
+                drawFogOfWar(currentLoc.fog);
+                ctx.fillStyle = "#444"; ctx.font = "16px Arial"; ctx.textAlign = "center";
+                ctx.fillText(`📍 Локация без карты: ${currentLoc.name}`, canvas.width / 2, canvas.height / 2);
+                drawDynamicRulers(canvas.width, canvas.height);
+            }
+        }
+
+        function drawVectorDrawings(drawings) {
+            if (!drawings) return;
+            ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            drawings.forEach(line => {
+                if (line.points.length < 2) return;
+                ctx.beginPath(); ctx.strokeStyle = line.color; ctx.lineWidth = line.size * zoomLevel;
+                ctx.moveTo(line.points[0].x * zoomLevel + offsetX, line.points[0].y * zoomLevel + offsetY);
+                for(let i = 1; i < line.points.length; i++) { ctx.lineTo(line.points[i].x * zoomLevel + offsetX, line.points[i].y * zoomLevel + offsetY); }
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+
+        function drawFogOfWar(fogList) {
+            if (!fogList) return;
+            ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            fogList.forEach(area => {
+                if (area.points.length < 2) return;
+                ctx.beginPath();
+                if (area.hidden) {
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+                } else {
+                    let r = 0, g = 0, b = 0;
+                    if (area.color && area.color.startsWith('#')) {
+                        let c = area.color.substring(1);
+                        if(c.length === 6) { r = parseInt(c.substring(0,2), 16); g = parseInt(c.substring(2,4), 16); b = parseInt(c.substring(4,6), 16); }
+                    }
+                    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${area.opacity !== undefined ? area.opacity : 0.85})`;
+                    ctx.lineWidth = (area.size || 40) * zoomLevel; 
+                }
+                ctx.moveTo(area.points[0].x * zoomLevel + offsetX, area.points[0].y * zoomLevel + offsetY);
+                for(let i = 1; i < area.points.length; i++) { ctx.lineTo(area.points[i].x * zoomLevel + offsetX, area.points[i].y * zoomLevel + offsetY); }
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+
+        function drawTacticalGrid(width, height) {
+            const scaledCell = cellSize * zoomLevel;
+            const cols = Math.ceil(width / cellSize); const rows = Math.ceil(height / cellSize);
+            ctx.save(); ctx.strokeStyle = (gridColor === 'white') ? `rgba(255,255,255,${gridOpacity})` : `rgba(0,0,0,${gridOpacity})`; ctx.lineWidth = 1;
+            for (let i = 0; i <= cols; i++) { const x = offsetX + i * scaledCell; ctx.beginPath(); ctx.moveTo(x, offsetY); ctx.lineTo(x, offsetY + rows * scaledCell); ctx.stroke(); }
+            for (let j = 0; j <= rows; j++) { const y = offsetY + j * scaledCell; ctx.beginPath(); ctx.moveTo(offsetX, y); ctx.lineTo(offsetX + cols * scaledCell, y); ctx.stroke(); }
+            ctx.restore();
+        }
+
+        function drawDynamicRulers(mapWidth, mapHeight) {
+            ctx.save(); const scaledCell = cellSize * zoomLevel;
+            const cols = Math.ceil(mapWidth / cellSize); const rows = Math.ceil(mapHeight / cellSize);
+            ctx.fillStyle = "rgba(20, 20, 26, 0.95)"; ctx.fillRect(rulerSize, 0, canvas.width - rulerSize, rulerSize);
+            ctx.fillStyle = "#383842"; ctx.fillRect(rulerSize, rulerSize - 1, canvas.width - rulerSize, 1);
+            ctx.font = "bold 11px 'Segoe UI', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.save(); ctx.beginPath(); ctx.rect(rulerSize, 0, canvas.width - rulerSize, rulerSize); ctx.clip();
+            for (let i = 0; i < cols; i++) {
+                const cellCenter = offsetX + i * scaledCell + scaledCell / 2;
+                if (cellCenter > rulerSize && cellCenter < canvas.width) {
+                    ctx.fillStyle = "#ffd166"; ctx.fillText(getCharLabel(i), cellCenter, rulerSize / 2);
+                    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(offsetX + i * scaledCell, rulerSize - 6, 1, 6);
+                }
+            }
+            ctx.restore();
+            ctx.fillStyle = "rgba(20, 20, 26, 0.95)"; ctx.fillRect(0, rulerSize, rulerSize, canvas.height - rulerSize);
+            ctx.fillStyle = "#383842"; ctx.fillRect(rulerSize - 1, rulerSize, 1, canvas.height - rulerSize);
+            ctx.save(); ctx.beginPath(); ctx.rect(0, rulerSize, rulerSize, canvas.height - rulerSize); ctx.clip();
+            for (let j = 0; j < rows; j++) {
+                const cellCenter = offsetY + j * scaledCell + scaledCell / 2;
+                if (cellCenter > rulerSize && cellCenter < canvas.height) {
+                    ctx.fillStyle = "#ff4a4a"; ctx.fillText(j + 1, rulerSize / 2, cellCenter);
+                    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(rulerSize - 6, offsetY + j * scaledCell, 6, 1);
+                }
+            }
+            ctx.restore();
+            ctx.fillStyle = "#14141a"; ctx.fillRect(0, 0, rulerSize, rulerSize);
+            ctx.fillStyle = "#383842"; ctx.fillRect(rulerSize - 1, 0, 1, rulerSize); ctx.fillRect(0, rulerSize - 1, rulerSize, 1);
+            ctx.restore();
+        }
+
+        function getCharLabel(index) { let label = ''; while (index >= 0) { label = String.fromCharCode((index % 26) + 65) + label; index = Math.floor(index / 26) - 1; } return label; }
+
+        // --- ЛОКАЦИИ И БИБЛИОТЕКА ---
+        function renderLocations() {
+            const list = document.getElementById('location-list'); list.innerHTML = '';
+            adventureData.locations.forEach(loc => {
+                const li = document.createElement('li'); li.className = `tree-item ${loc.id === adventureData.currentLocationId ? 'folder-header' : ''}`;
+                if(loc.id === adventureData.currentLocationId) li.style.color = 'var(--accent-color)';
+                li.innerHTML = `<span onclick="selectLocation(${loc.id})">📍 ${loc.name}</span>
+                    ${adventureData.locations.length > 1 ? `<button class="delete-item" onclick="deleteLocation(${loc.id}, event)">×</button>` : ''}`;
+                list.appendChild(li);
+            });
+        }
+
+        function addLocation() { 
+            let maxIndex = 0;
+            adventureData.locations.forEach(loc => {
+                const match = loc.name.match(/\d+/g);
+                if (match) {
+                    const val = parseInt(match[match.length - 1]);
+                    if (val > maxIndex) maxIndex = val;
+                }
+            });
+            
+            const nextName = `Локация ${maxIndex + 1}`;
+            const name = prompt("Название локации:", nextName); 
+            if (name) { 
+                adventureData.locations.push({ id: Date.now(), name: name, bgData: null, tokens: [], drawings: [], fog: [] }); 
+                renderLocations(); 
+                drawCanvas(); 
+            } 
+        }
+
+        function selectLocation(id) { adventureData.currentLocationId = id; renderLocations(); drawCanvas(); }
+        
+        function deleteLocation(id, event) { 
+            event.stopPropagation(); 
+            if (adventureData.locations.length <= 1) return; 
+            
+            const loc = adventureData.locations.find(l => l.id === id);
+            if (!loc) return;
+
+            if (confirm(`Вы уверены, что хотите удалить локацию "${loc.name}"?`)) {
+                adventureData.locations = adventureData.locations.filter(l => l.id !== id); 
+                if (adventureData.currentLocationId === id) adventureData.currentLocationId = adventureData.locations[0].id; 
+                renderLocations(); 
+                drawCanvas(); 
+            }
+        }
+
+        function createFolder() { const name = prompt("Название папки:"); if (name) { adventureData.library.push({ id: Date.now(), name: name, type: 'folder', collapsed: false, children: [] }); renderLibrary(); } }
+        function toggleFolder(id) { const folder = adventureData.library.find(f => f.id === id); if (folder) { folder.collapsed = !folder.collapsed; renderLibrary(); } }
+
+        // УДАЛЕНИЕ ПАПКИ С ФАЙЛАМИ
+        function deleteFolder(folderId, event) {
+            event.stopPropagation();
+            const folder = adventureData.library.find(f => f.id === folderId);
+            if (!folder) return;
+            
+            const msg = folder.children.length > 0 
+                ? `Удалить папку "${folder.name}" и все файлы внутри неё (${folder.children.length} шт.)?`
+                : `Удалить пустую папку "${folder.name}"?`;
+                
+            if (confirm(msg)) {
+                adventureData.library = adventureData.library.filter(f => f.id !== folderId);
+                renderLibrary();
+            }
+        }
+
+        // УДАЛЕНИЕ ОДНОГО ФАЙЛА ИЗ ПАПКИ
+        function deleteFile(folderId, fileId, event) {
+            event.stopPropagation();
+            const folder = adventureData.library.find(f => f.id === folderId);
+            if (folder) {
+                folder.children = folder.children.filter(file => file.id !== fileId);
+                renderLibrary();
+            }
+        }
+
+        function renderLibrary() {
+            const tree = document.getElementById('file-tree'); tree.innerHTML = '';
+            adventureData.library.forEach(folder => {
+                const folderDiv = document.createElement('div'); folderDiv.className = 'folder-container';
+                const headerEl = document.createElement('div'); headerEl.className = 'tree-item folder-header';
+                
+                const arrow = folder.collapsed ? '▶' : '▼';
+                headerEl.innerHTML = `<span onclick="toggleFolder(${folder.id})">${arrow} 📁 ${folder.name}</span>
+                    <button class="delete-item" onclick="deleteFolder(${folder.id}, event)">×</button>`;
+                
+                headerEl.addEventListener('dragenter', (e) => { e.preventDefault(); headerEl.classList.add('drag-over'); });
+                headerEl.addEventListener('dragover', (e) => e.preventDefault());
+                headerEl.addEventListener('dragleave', () => { headerEl.classList.remove('drag-over'); });
+                
+                headerEl.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    headerEl.classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        for (let file of files) {
+                            const reader = new FileReader();
+                            reader.onload = function(ev) { folder.children.push({ id: Date.now()+Math.random(), name: file.name, data: ev.target.result }); renderLibrary(); };
+                            reader.readAsDataURL(file);
+                        }
+                    }
+                });
+                
+                const childrenUl = document.createElement('ul'); 
+                childrenUl.className = 'folder-children' + (folder.collapsed ? ' collapsed' : '');
+                
+                folder.children.forEach(file => {
+                    const fileLi = document.createElement('li'); fileLi.className = 'tree-item file-item'; fileLi.setAttribute('draggable', 'true');
+                    fileLi.innerHTML = `<span>🖼️ ${file.name}</span>
+                        <button class="delete-item" onclick="deleteFile(${folder.id}, ${file.id}, event)">×</button>`; 
+                    fileLi.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', file.data));
+                    childrenUl.appendChild(fileLi);
+                });
+                folderDiv.appendChild(headerEl); folderDiv.appendChild(childrenUl); tree.appendChild(folderDiv);
+            });
+        }
+
+        function drawTokens(tokens) {
+            tokens.forEach((token) => {
+                const cacheKey = `token_${token.id}`; 
+                const screenX = token.x * zoomLevel + offsetX; 
+                const screenY = token.y * zoomLevel + offsetY; 
+                const screenRadius = token.radius * zoomLevel;
+                
+                const renderCircularToken = (imgObj) => {
+                    ctx.save(); ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.clip();
+                    ctx.drawImage(imgObj, screenX - screenRadius, screenY - screenRadius, screenRadius * 2, screenRadius * 2); ctx.restore();
+                    ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
+                };
+                if (imageCache.has(cacheKey)) { renderCircularToken(imageCache.get(cacheKey)); } 
+                else { const img = new Image(); img.src = token.src; img.onload = function() { imageCache.set(cacheKey, img); renderCircularToken(img); }; }
+            });
+        }
+
+        dropZone.addEventListener('dragover', (e) => e.preventDefault());
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); const internalData = e.dataTransfer.getData('text/plain');
+            const rect = canvas.getBoundingClientRect();
+            const mapX = (e.clientX - rect.left - offsetX) / zoomLevel; const mapY = (e.clientY - rect.top - offsetY) / zoomLevel;
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId); if (!currentLoc) return;
+
+            if (internalData) { 
+                currentLoc.tokens.push({ id: Date.now(), src: internalData, x: mapX, y: mapY, radius: 25 }); 
+                drawCanvas(); 
+            } else {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) { const reader = new FileReader(); reader.onload = function(event) { currentLoc.bgData = event.target.result; imageCache.delete(`bg_${currentLoc.id}`); drawCanvas(); }; reader.readAsDataURL(files[0]); }
+            }
+        });
+
+        function saveAdventure() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(adventureData)); const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "my_adventure.json"); dl.click(); }
+        function loadAdventure(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { adventureData = JSON.parse(e.target.result); imageCache.clear(); renderLocations(); renderLibrary(); drawCanvas(); } catch { alert("Ошибка файла!"); } }; reader.readAsText(file); }
+
+        initMenus(); renderLocations(); renderLibrary(); resizeCanvas();
+    </script>
+</body>
+</html>
