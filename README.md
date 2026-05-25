@@ -1,4 +1,6 @@
-# 📍 DM's Tactical Board
+![DM Board Preview](preview.png)
+
+|# 📍 DM's Tactical Board
 
 Простая, легковесная и отзывчивая интерактивная тактическая веб-карта (VTT — Virtual Tabletop), созданная специально для мастеров настольных ролевых игр (Dungeons & Dragons, Pathfinder и др.). 
 
