@@ -202,8 +202,9 @@
 
     <script>
         // --- СТРУКТУРА ДАННЫХ ---
+        // Каждой локации по умолчанию задаем индивидуальные свойства zoomLevel, offsetX, offsetY
         let adventureData = {
-            locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [] }],
+            locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50 }],
             currentLocationId: 1,
             library: [
                 { id: 101, name: "Локации", type: 'folder', collapsed: false, children: [] },
@@ -346,7 +347,11 @@
             document.getElementById('grid-color-toggle').innerText = `🎨 ${gridColor === 'white' ? 'Белая' : 'Черная'}`;
             drawCanvas();
         }
-        function changeZoom(amount) { zoomLevel = Math.max(0.2, Math.min(5.0, zoomLevel + amount)); document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`; drawCanvas(); }
+        function changeZoom(amount) { 
+            zoomLevel = Math.max(0.2, Math.min(5.0, zoomLevel + amount)); 
+            document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`; 
+            drawCanvas(); 
+        }
         function resetZoom() { zoomLevel = 1.0; offsetX = 50; offsetY = 50; document.getElementById('zoom-text').innerText = "100%"; drawCanvas(); }
         function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); }
         function switchTab(tabName, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); btn.classList.add('active'); document.getElementById(`tab-${tabName}`).classList.add('active'); }
@@ -588,6 +593,23 @@
 
         function getCharLabel(index) { let label = ''; while (index >= 0) { label = String.fromCharCode((index % 26) + 65) + label; index = Math.floor(index / 26) - 1; } return label; }
 
+        function drawTokens(tokens) {
+            tokens.forEach((token) => {
+                const cacheKey = `token_${token.id}`; 
+                const screenX = token.x * zoomLevel + offsetX; 
+                const screenY = token.y * zoomLevel + offsetY; 
+                const screenRadius = token.radius * zoomLevel;
+                
+                const renderCircularToken = (imgObj) => {
+                    ctx.save(); ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.clip();
+                    ctx.drawImage(imgObj, screenX - screenRadius, screenY - screenRadius, screenRadius * 2, screenRadius * 2); ctx.restore();
+                    ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
+                };
+                if (imageCache.has(cacheKey)) { renderCircularToken(imageCache.get(cacheKey)); } 
+                else { const img = new Image(); img.src = token.src; img.onload = function() { imageCache.set(cacheKey, img); renderCircularToken(img); }; }
+            });
+        }
+
         // --- ЛОКАЦИИ И БИБЛИОТЕКА ---
         function renderLocations() {
             const list = document.getElementById('location-list'); list.innerHTML = '';
@@ -599,7 +621,7 @@
                 list.appendChild(li);
             });
         }
-
+        
         function addLocation() { 
             let maxIndex = 0;
             adventureData.locations.forEach(loc => {
@@ -613,28 +635,55 @@
             const nextName = `Локация ${maxIndex + 1}`;
             const name = prompt("Название локации:", nextName); 
             if (name) { 
-                adventureData.locations.push({ id: Date.now(), name: name, bgData: null, tokens: [], drawings: [], fog: [] }); 
+                adventureData.locations.push({ 
+                    id: Date.now(), 
+                    name: name, 
+                    bgData: null, 
+                    tokens: [], 
+                    drawings: [], 
+                    fog: [],
+                    zoomLevel: 1.0,
+                    offsetX: 50,
+                    offsetY: 50
+                }); 
                 renderLocations(); 
                 drawCanvas(); 
             } 
         }
 
-        function selectLocation(id) { adventureData.currentLocationId = id; renderLocations(); drawCanvas(); }
-        
-        function deleteLocation(id, event) { 
-            event.stopPropagation(); 
-            if (adventureData.locations.length <= 1) return; 
-            
-            const loc = adventureData.locations.find(l => l.id === id);
-            if (!loc) return;
-
-            if (confirm(`Вы уверены, что хотите удалить локацию "${loc.name}"?`)) {
-                adventureData.locations = adventureData.locations.filter(l => l.id !== id); 
-                if (adventureData.currentLocationId === id) adventureData.currentLocationId = adventureData.locations[0].id; 
-                renderLocations(); 
-                drawCanvas(); 
+        function selectLocation(id) { 
+            // 1. Сохраняем положение камеры текущей активной локации перед уходом с нее
+            const oldLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (oldLoc) {
+                oldLoc.zoomLevel = zoomLevel;
+                oldLoc.offsetX = offsetX;
+                oldLoc.offsetY = offsetY;
             }
+
+            // 2. Переключаем на новую локацию
+            adventureData.currentLocationId = id; 
+
+            // 3. Вытягиваем параметры камеры для новой локации
+            const newLoc = adventureData.locations.find(l => l.id === id);
+            if (newLoc) {
+                zoomLevel = newLoc.zoomLevel !== undefined ? newLoc.zoomLevel : 1.0;
+                offsetX = newLoc.offsetX !== undefined ? newLoc.offsetX : 50;
+                offsetY = newLoc.offsetY !== undefined ? newLoc.offsetY : 50;
+            }
+
+            // 4. Корректируем отображаемый процент зума
+            document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`;
+
+            renderLocations(); 
+            drawCanvas(); 
         }
+
+        function deleteLocation(id, event) { event.stopPropagation(); if (adventureData.locations.length <= 1) return; adventureData.locations = adventureData.locations.filter(l => l.id !== id); if (adventureData.currentLocationId === id) selectLocation(adventureData.locations[0].id); else { renderLocations(); drawCanvas(); } }
+
+        document.getElementById('load-file').addEventListener('click', function() {
+            // Костыль, чтобы принудительно перезагружать один и тот же файл при разработке
+            this.value = null;
+        });
 
         function createFolder() { const name = prompt("Название папки:"); if (name) { adventureData.library.push({ id: Date.now(), name: name, type: 'folder', collapsed: false, children: [] }); renderLibrary(); } }
         function toggleFolder(id) { const folder = adventureData.library.find(f => f.id === id); if (folder) { folder.collapsed = !folder.collapsed; renderLibrary(); } }
@@ -706,23 +755,6 @@
             });
         }
 
-        function drawTokens(tokens) {
-            tokens.forEach((token) => {
-                const cacheKey = `token_${token.id}`; 
-                const screenX = token.x * zoomLevel + offsetX; 
-                const screenY = token.y * zoomLevel + offsetY; 
-                const screenRadius = token.radius * zoomLevel;
-                
-                const renderCircularToken = (imgObj) => {
-                    ctx.save(); ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.clip();
-                    ctx.drawImage(imgObj, screenX - screenRadius, screenY - screenRadius, screenRadius * 2, screenRadius * 2); ctx.restore();
-                    ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
-                };
-                if (imageCache.has(cacheKey)) { renderCircularToken(imageCache.get(cacheKey)); } 
-                else { const img = new Image(); img.src = token.src; img.onload = function() { imageCache.set(cacheKey, img); renderCircularToken(img); }; }
-            });
-        }
-
         dropZone.addEventListener('dragover', (e) => e.preventDefault());
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault(); const internalData = e.dataTransfer.getData('text/plain');
@@ -739,8 +771,51 @@
             }
         });
 
-        function saveAdventure() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(adventureData)); const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", "my_adventure.json"); dl.click(); }
-        function loadAdventure(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { adventureData = JSON.parse(e.target.result); imageCache.clear(); renderLocations(); renderLibrary(); drawCanvas(); } catch { alert("Ошибка файла!"); } }; reader.readAsText(file); }
+        function saveAdventure() { 
+            // Перед записью JSON синхронизируем координаты активного экрана с данными текущей локации
+            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
+            if (currentLoc) {
+                currentLoc.zoomLevel = zoomLevel;
+                currentLoc.offsetX = offsetX;
+                currentLoc.offsetY = offsetY;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(adventureData)); 
+            const dl = document.createElement('a'); 
+            dl.setAttribute("href", dataStr); 
+            dl.setAttribute("download", "my_adventure.json"); 
+            dl.click(); 
+        }
+        
+        function loadAdventure(event) { 
+            const file = event.target.files[0]; 
+            if (!file) return; 
+            const reader = new FileReader(); 
+            reader.onload = function(e) { 
+                try { 
+                    adventureData = JSON.parse(e.target.result); 
+                    imageCache.clear(); 
+                    
+                    // При загрузке JSON вытаскиваем координаты для текущей активной локации сессии
+                    const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId) || adventureData.locations[0];
+                    if (currentLoc) {
+                        adventureData.currentLocationId = currentLoc.id;
+                        zoomLevel = currentLoc.zoomLevel !== undefined ? currentLoc.zoomLevel : 1.0;
+                        offsetX = currentLoc.offsetX !== undefined ? currentLoc.offsetX : 50;
+                        offsetY = currentLoc.offsetY !== undefined ? currentLoc.offsetY : 50;
+                    }
+                    
+                    document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`;
+                    
+                    renderLocations(); 
+                    renderLibrary(); 
+                    drawCanvas(); 
+                } catch { 
+                    alert("Ошибка файла!"); 
+                } 
+            }; 
+            reader.readAsText(file); 
+        }
 
         initMenus(); renderLocations(); renderLibrary(); resizeCanvas();
     </script>
