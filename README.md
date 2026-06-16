@@ -1,4 +1,4 @@
-![DM Board Preview](preview.png)
+<img width="2540" height="1302" alt="pr" src="https://github.com/user-attachments/assets/b22398fb-a62a-4a58-952c-48be450adf97" />
 
 |# 📍 DM's Tactical Board
 
