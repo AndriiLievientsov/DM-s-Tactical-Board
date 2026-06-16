@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DM's Tactical Board</title>
+    <title>DM's Tactical Board v2</title>
     <style>
         :root {
             --bg-color: #1a1a1f;
@@ -17,27 +17,27 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
         /* Upper Panel Structure */
-        header { background: var(--panel-color); border-bottom: 2px solid var(--border-color); padding: 10px 20px; display: flex; align-items: center; user-select: none; z-index: 10; gap: 15px; }
-        
-        .left-block { display: flex; align-items: center; gap: 10px; }
+        header { background: var(--panel-color); border-bottom: 2px solid var(--border-color); padding: 10px 20px; display: flex; align-items: center; user-select: none; z-index: 10; gap: 15px; flex-wrap: nowrap; }
+
+        .left-block { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .center-block { display: flex; align-items: center; justify-content: center; flex: 1; gap: 10px; }
-        .right-block { width: 120px; text-align: right; font-size: 14px; color: #888; }
+        .right-block { flex-shrink: 0; font-size: 13px; color: #888; }
 
-        .system-btn { background: #32323d; border: 1px solid var(--border-color); color: var(--text-color); padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .system-btn { background: #32323d; border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; font-size: 13px; }
         .system-btn:hover { background: #41414f; }
-        
-        .controls-group { display: flex; align-items: center; background: #111116; padding: 4px; border-radius: 6px; gap: 5px; }
-        .zoom-btn { background: #32323d; border: none; color: white; width: 30px; height: 30px; cursor: pointer; font-weight: bold; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
-        .zoom-btn:hover { background: #41414f; }
-        .zoom-val { min-width: 50px; text-align: center; font-size: 13px; font-weight: bold; color: #aaa; }
 
-        .grid-toggle-btn { background: #32323d; border: 1px solid var(--border-color); color: #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; white-space: nowrap; }
+        .controls-group { display: flex; align-items: center; background: #111116; padding: 4px; border-radius: 6px; gap: 5px; }
+        .zoom-btn { background: #32323d; border: none; color: white; width: 28px; height: 28px; cursor: pointer; font-weight: bold; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .zoom-btn:hover { background: #41414f; }
+        .zoom-val { min-width: 46px; text-align: center; font-size: 12px; font-weight: bold; color: #aaa; }
+
+        .grid-toggle-btn { background: #32323d; border: 1px solid var(--border-color); color: #ccc; padding: 4px 9px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; white-space: nowrap; }
         .grid-toggle-btn.active { background: #2e5cb8; color: white; border-color: #4575d4; }
-        .grid-opacity-slider { width: 60px; cursor: pointer; accent-color: #2e5cb8; }
+        .grid-opacity-slider { width: 55px; cursor: pointer; accent-color: #2e5cb8; }
 
         /* Modes Buttons */
         .mode-container { position: relative; display: inline-block; }
-        .mode-btn { background: #32323d; border: 1px solid var(--border-color); color: #aaa; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .mode-btn { background: #32323d; border: 1px solid var(--border-color); color: #aaa; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 5px; transition: 0.2s; font-size: 13px; }
         .mode-btn:hover { background: #3d3d4a; color: white; }
         .mode-btn.active { background: var(--accent-color); color: white; border-color: #ff6b6b; }
 
@@ -46,7 +46,42 @@
         .drawing-popup.show { display: block; }
         .popup-title { font-size: 12px; font-weight: bold; color: #888; margin-bottom: 4px; margin-top: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         .popup-title:first-child { margin-top: 0; }
-        
+
+        /* Fog mode switcher */
+        .fog-mode-switcher { display: flex; gap: 4px; margin-bottom: 2px; }
+        .fog-mode-btn { flex: 1; padding: 6px 4px; font-size: 11px; font-weight: bold; background: #2a2a33; border: 1px solid var(--border-color); color: #888; border-radius: 4px; cursor: pointer; transition: 0.15s; white-space: nowrap; }
+        .fog-mode-btn:hover { background: #35353f; color: #ccc; }
+        .fog-mode-btn.active { background: #1e3a5f; border-color: #2979ff; color: #82b1ff; }
+
+        /* Initiative tracker */
+        .init-toolbar { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
+        .init-toolbar button { flex: 1; padding: 6px 4px; font-size: 11px; font-weight: bold; background: #32323d; border: 1px solid var(--border-color); color: #ccc; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .init-toolbar button:hover { background: #41414f; }
+        .init-round { font-size: 11px; color: #888; text-align: center; margin-bottom: 8px; }
+        .init-round span { color: #ffd166; font-weight: bold; }
+        .init-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+        .init-item { display: flex; flex-direction: column; gap: 5px; padding: 7px 8px; background: #1b1b22; border-radius: 6px; border: 1px solid transparent; transition: 0.15s; }
+        .init-item.active-turn { background: #1a2a1a; border-color: #2e7d32; box-shadow: 0 0 8px rgba(46,125,50,0.35); }
+        .init-item.active-turn .init-name { color: #81c784; }
+
+        .init-row-top { display: flex; align-items: center; gap: 5px; }
+        .init-val { width: 42px; background: #111116; border: 1px solid var(--border-color); color: #ffd166; font-weight: bold; font-size: 13px; text-align: center; border-radius: 3px; padding: 3px 2px; flex-shrink: 0; }
+        .init-name { flex: 1; font-size: 12px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .init-statuses { font-size: 11px; letter-spacing: 1px; }
+        .init-del { background: transparent; border: none; color: #555; cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1; flex-shrink: 0; }
+        .init-del:hover { color: var(--accent-color); }
+
+        .init-hp-row { display: flex; align-items: center; gap: 3px; }
+        .init-hp-btn { background: #2a2a35; border: 1px solid var(--border-color); color: #ccc; border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: bold; padding: 2px 6px; flex-shrink: 0; transition: 0.1s; line-height: 1.4; }
+        .init-hp-btn:hover { background: #3a3a48; color: white; }
+        .init-hp-btn.minus, .init-hp-btn.minus5 { color: #ff7070; }
+        .init-hp-btn.minus:hover, .init-hp-btn.minus5:hover { background: #3a1f1f; border-color: #ff4a4a; }
+        .init-hp-btn.plus, .init-hp-btn.plus5 { color: #81c784; }
+        .init-hp-btn.plus:hover, .init-hp-btn.plus5:hover { background: #1a2e1a; border-color: #2e7d32; }
+        .init-hp-input { flex: 1; min-width: 0; background: #111116; border: 1px solid var(--border-color); color: #ff9090; font-weight: bold; font-size: 13px; text-align: center; border-radius: 3px; padding: 2px 4px; }
+        .init-hp-input:focus { outline: none; border-color: #ff4a4a; }
+
         .color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 5px; }
         .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.1s; display: inline-block; box-shadow: inset 0 0 4px rgba(0,0,0,0.5); }
         .color-circle:hover { transform: scale(1.1); }
@@ -55,27 +90,40 @@
         .brush-preview-box { background: #14141a; border-radius: 6px; padding: 10px; display: flex; align-items: center; justify-content: center; height: 45px; overflow: hidden; }
         .size-slider { width: 100%; cursor: pointer; accent-color: var(--accent-color); margin-top: 2px; }
 
+        /* Dice Roller */
+        .dice-container { position: relative; display: inline-block; flex-shrink: 0; }
+        #dice-toggle-btn { background: #32323d; border: 1px solid var(--border-color); color: #aaa; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px; transition: 0.2s; white-space: nowrap; }
+        #dice-toggle-btn:hover { background: #3d3d4a; color: white; }
+        #dice-toggle-btn.active { background: #7b2fff; color: white; border-color: #9b5fff; }
+        #dice-popup { position: absolute; top: calc(100% + 8px); right: 0; background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; width: 220px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
+        #dice-popup.show { display: block; }
+        #dice-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+        #dice-buttons .system-btn { padding: 6px 4px; font-size: 12px; text-align: center; font-weight: bold; }
+        #dice-result { font-size: 20px; color: #ffd166; font-weight: bold; text-align: center; min-height: 28px; margin-bottom: 8px; }
+        #dice-history { list-style: none; font-size: 11px; color: #666; border-top: 1px solid var(--border-color); padding-top: 8px; }
+        #dice-history li { padding: 2px 0; color: #888; }
+        #dice-history li:first-child { color: #aaa; }
+
         /* Main Workspace */
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         .sidebar { width: 320px; background: var(--panel-color); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; user-select: none; z-index: 5; }
         .tabs { display: flex; border-bottom: 1px solid var(--border-color); background: #1b1b22; }
-        .tab-btn { flex: 1; padding: 12px; background: transparent; border: none; color: #888; cursor: pointer; text-align: center; font-weight: bold; }
+        .tab-btn { flex: 1; padding: 12px; background: transparent; border: none; color: #888; cursor: pointer; text-align: center; font-weight: bold; font-size: 13px; }
         .tab-btn.active { color: var(--text-color); border-bottom: 2px solid var(--accent-color); background: var(--panel-color); }
         .tab-content { flex: 1; padding: 15px; overflow-y: auto; display: none; }
         .tab-content.active { display: block; }
 
         .tree-actions { margin-bottom: 15px; display: flex; gap: 5px; }
         .tree-btn { flex: 1; padding: 6px; font-size: 12px; background: #32323d; border: none; color: white; border-radius: 4px; cursor: pointer; }
-        
+        .tree-btn:hover { background: #41414f; }
+
         .location-list { list-style: none; }
         .tree-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; margin-bottom: 4px; background: #1b1b22; border-radius: 4px; cursor: pointer; border: 1px solid transparent; transition: 0.15s; }
         .tree-item.folder-header { font-weight: bold; color: #ffd166; background: #262633; }
-        
         .tree-item.folder-header.drag-over { background: #323247; border-color: #ffd166; box-shadow: 0 0 8px rgba(255, 209, 102, 0.3); }
-
         .tree-item .delete-item { color: #ff4a4a; cursor: pointer; font-weight: bold; border: none; background: transparent; padding: 0 5px; font-size: 16px; line-height: 1; }
         .tree-item .delete-item:hover { transform: scale(1.2); }
-        
+
         .folder-container { margin-bottom: 5px; }
         .folder-children { list-style: none; padding-left: 15px; margin-top: 4px; }
         .folder-children.collapsed { display: none; }
@@ -84,13 +132,11 @@
         .canvas-area { flex: 1; position: relative; background: #0d0d11; overflow: hidden; }
         #game-canvas { width: 100%; height: 100%; display: block; }
 
-        /* Контекстные меню и двухуровневая структура */
-        .ctx-menu-list { position: absolute; background: #2a2a32; border: 1px solid #3f3f4a; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; display: none; z-index: 1000; list-style: none; padding: 5px 0; min-width: 160px; user-select: none; }
+        /* Context menus */
+        .ctx-menu-list { position: fixed; background: #2a2a32; border: 1px solid #3f3f4a; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; display: none; z-index: 1000; list-style: none; padding: 5px 0; min-width: 160px; user-select: none; }
         .ctx-menu-list li { padding: 8px 15px; cursor: pointer; font-size: 14px; color: var(--text-color); position: relative; display: flex; justify-content: space-between; align-items: center; }
         .ctx-menu-list li:hover { background: #383842; }
-
         .ctx-menu-list li .arrow { font-size: 10px; color: #888; }
-        
         .ctx-submenu { position: absolute; top: 0; left: 100%; background: #2a2a32; border: 1px solid #3f3f4a; border-radius: 4px; padding: 5px 0; list-style: none; min-width: 150px; display: none; box-shadow: 4px 4px 10px rgba(0,0,0,0.5); }
         .ctx-menu-list li:hover .ctx-submenu { display: block; }
     </style>
@@ -99,32 +145,46 @@
 
     <header>
         <div class="left-block">
-            <button class="system-btn" onclick="saveAdventure()">💾 Сохранить</button>
-            <button class="system-btn" onclick="document.getElementById('load-file').click()">📂 Загрузить</button>
-            <input type="file" id="load-file" style="display:none" onchange="loadAdventure(event)" accept=".json">
+            <button class="system-btn" id="save-adventure-btn">💾 Сохранить</button>
+            <button class="system-btn" id="load-adventure-btn">📂 Загрузить</button>
+            <input type="file" id="load-adventure-file" style="display:none" accept=".json">
 
             <div class="controls-group">
-                <button class="grid-toggle-btn" id="grid-toggle" onclick="toggleGrid()">🌐 Сетка</button>
-                <input type="range" class="grid-opacity-slider" id="grid-opacity" min="5" max="100" value="40" oninput="changeGridOpacity(this.value)">
-                <button class="grid-toggle-btn" id="grid-color-toggle" onclick="toggleGridColor()">🎨 Белая</button>
+                <button class="system-btn" id="btn-undo" disabled>↩️</button>
+                <button class="system-btn" id="btn-redo" disabled>↪️</button>
             </div>
 
             <div class="controls-group">
-                <button class="zoom-btn" onclick="changeZoom(-0.1)">−</button>
+                <button class="grid-toggle-btn" id="grid-toggle">🌐 Сетка</button>
+                <input type="range" class="grid-opacity-slider" id="grid-opacity" min="5" max="100" value="40">
+                <button class="grid-toggle-btn" id="grid-color-toggle">🎨 Белая</button>
+            </div>
+
+            <div class="controls-group">
+                <button class="zoom-btn" id="zoom-out-btn">−</button>
                 <span class="zoom-val" id="zoom-text">100%</span>
-                <button class="zoom-btn" onclick="changeZoom(0.1)">＋</button>
-                <button class="zoom-btn" onclick="resetZoom()" style="width: auto; padding: 0 6px; font-size: 11px;">100%</button>
-                <button class="zoom-btn" onclick="toggleFullscreen()">📺</button>
+                <button class="zoom-btn" id="zoom-in-btn">＋</button>
+                <button class="zoom-btn" id="reset-zoom-btn" style="width: auto; padding: 0 6px; font-size: 11px;">100%</button>
+                <button class="zoom-btn" id="fullscreen-toggle-btn">📺</button>
             </div>
         </div>
 
         <div class="center-block">
             <div class="mode-container">
-                <button class="mode-btn active" id="btn-mode-move" onclick="setMode('move')">✋ Перемещение</button>
+                <button class="mode-btn active" id="btn-mode-move" data-mode="move">✋ Перемещение</button>
             </div>
-            
+
             <div class="mode-container">
-                <button class="mode-btn" id="btn-mode-draw" onclick="setMode('draw')">✏️ Рисование</button>
+                <button class="mode-btn" id="btn-mode-select" data-mode="select">⬚ Выделение</button>
+            </div>
+
+            <div class="controls-group">
+                <button class="zoom-btn" id="btn-copy-tokens" title="Копировать выделенные токены (Ctrl+C)" style="width:auto; padding:0 8px; font-size:12px;">⎘ Копировать</button>
+                <button class="zoom-btn" id="btn-paste-tokens" title="Вставить токены (Ctrl+V)" style="width:auto; padding:0 8px; font-size:12px;">⎙ Вставить</button>
+            </div>
+
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-draw" data-mode="draw">✏️ Рисование</button>
                 <div class="drawing-popup" id="drawing-menu">
                     <div class="popup-title">Цвета</div>
                     <div class="color-grid" id="brush-colors"></div>
@@ -132,46 +192,92 @@
                     <div class="brush-preview-box">
                         <canvas id="brush-preview" width="240" height="30"></canvas>
                     </div>
-                    <input type="range" class="size-slider" id="brush-size" min="2" max="30" value="6" oninput="updateBrushSize(this.value)">
+                    <input type="range" class="size-slider" id="brush-size-slider" min="2" max="30" value="6">
                 </div>
             </div>
 
             <div class="mode-container">
-                <button class="mode-btn" id="btn-mode-eraser" onclick="setMode('eraser')">🧽 Ластик</button>
+                <button class="mode-btn" id="btn-mode-eraser" data-mode="eraser">🧽 Ластик</button>
             </div>
-            
+
             <div class="mode-container">
-                <button class="mode-btn" id="btn-mode-fog" onclick="setMode('fog')">🌫️ Туман</button>
+                <button class="mode-btn" id="btn-mode-fog" data-mode="fog">🌫️ Туман</button>
                 <div class="drawing-popup" id="fog-menu-popup">
+                    <!-- Mode switcher -->
+                    <div class="popup-title">Режим нанесения</div>
+                    <div class="fog-mode-switcher">
+                        <button class="fog-mode-btn active" data-fogmode="brush" title="Кисть — рисуй как маркером">🖌️ Кисть</button>
+                        <button class="fog-mode-btn" data-fogmode="polygon" title="Полигон — кликай точки, замкни двойным кликом">📐 Полигон</button>
+                        <button class="fog-mode-btn" data-fogmode="rect" title="Прямоугольник — тяни drag'ом">▭ Прямоугольник</button>
+                    </div>
+                    <!-- Brush options (shown only in brush mode) -->
+                    <div id="fog-brush-options">
+                        <div class="popup-title">Размер кисти</div>
+                        <div class="brush-preview-box">
+                            <canvas id="fog-preview" width="240" height="30"></canvas>
+                        </div>
+                        <input type="range" class="size-slider" id="fog-size-slider" min="10" max="300" value="60">
+                    </div>
+                    <!-- Shared options -->
                     <div class="popup-title">Цвет тумана</div>
                     <div class="color-grid" id="fog-colors"></div>
-                    <div class="popup-title">Размер кисти тумана</div>
-                    <div class="brush-preview-box">
-                        <canvas id="fog-preview" width="240" height="30"></canvas>
+                    <div class="popup-title" id="fog-opacity-text">Плотность: 100%</div>
+                    <input type="range" class="size-slider" id="fog-opacity-slider" min="10" max="100" value="100">
+                    <!-- Polygon hint -->
+                    <div id="fog-polygon-hint" style="display:none; font-size:11px; color:#888; margin-top:8px; line-height:1.5;">
+                        🖱️ Клик — добавить точку<br>
+                        ⏎ Двойной клик — замкнуть зону<br>
+                        Esc — отменить
                     </div>
-                    <input type="range" class="size-slider" id="fog-size" min="10" max="300" value="60" oninput="updateFogSize(this.value)">
-                    <div class="popup-title" id="fog-opacity-text">Плотность (Сила): 100%</div>
-                    <input type="range" class="size-slider" id="fog-opacity-slider" min="10" max="100" value="100" oninput="updateFogOpacity(this.value)">
                 </div>
+            </div>
+
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-ruler" data-mode="ruler">📏 Линейка</button>
             </div>
         </div>
 
-        <div class="right-block">DM Screen</div>
+        <div class="right-block">
+            <div class="dice-container">
+                <button id="dice-toggle-btn">🎲 Кубики</button>
+                <div id="dice-popup">
+                    <div id="dice-buttons"></div>
+                    <div id="dice-result"></div>
+                    <ul id="dice-history"></ul>
+                </div>
+            </div>
+        </div>
     </header>
 
     <div class="main-container">
         <aside class="sidebar">
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('locations', this)">📍 Локации</button>
-                <button class="tab-btn" onclick="switchTab('library', this)">📁 Библиотека</button>
+                <button class="tab-btn active" data-tab="locations">📍 Локации</button>
+                <button class="tab-btn" data-tab="library">📁 Библиотека</button>
+                <button class="tab-btn" data-tab="initiative">⚔️ Инициатива</button>
             </div>
             <div id="tab-locations" class="tab-content active">
-                <div class="tree-actions"><button class="tree-btn" onclick="addLocation()">＋ Новая локация</button></div>
+                <div class="tree-actions">
+                    <button class="tree-btn" id="add-location-btn">＋ Новая локация</button>
+                </div>
                 <ul class="location-list" id="location-list"></ul>
             </div>
             <div id="tab-library" class="tab-content">
-                <div class="tree-actions"><button class="tree-btn" onclick="createFolder()">📁 + Папка</button></div>
+                <div class="tree-actions">
+                    <button class="tree-btn" id="create-folder-btn">📁 + Папка</button>
+                </div>
                 <ul class="file-tree-list" id="file-tree"></ul>
+            </div>
+            <div id="tab-initiative" class="tab-content">
+                <div class="init-toolbar">
+                    <button id="init-import-btn">⬇️ Импорт токенов</button>
+                    <button id="init-add-btn">＋ Добавить</button>
+                    <button id="init-sort-btn">↕️ Сортировать</button>
+                    <button id="init-clear-btn">🗑️</button>
+                </div>
+                <button class="init-toolbar" style="width:100%; margin-bottom:8px; padding:8px; background:#1a3a1a; border:1px solid #2e7d32; border-radius:4px; color:#81c784; font-weight:bold; cursor:pointer; font-size:13px;" id="init-next-btn">▶ Следующий ход</button>
+                <div class="init-round">Раунд: <span id="init-round-num">1</span></div>
+                <ul class="init-list" id="init-list"></ul>
             </div>
         </aside>
 
@@ -180,644 +286,1698 @@
         </main>
     </div>
 
+    <!-- Context menus -->
     <ul class="ctx-menu-list" id="token-menu">
+        <li id="token-menu-name">✏️ Изменить имя</li>
+        <li id="token-menu-hp">❤️ Изменить HP</li>
         <li>
             <span>📐 Размер</span>
             <span class="arrow">▶</span>
             <ul class="ctx-submenu">
-                <li onclick="resizeSelectedToken(0.5)">Крошечный (0.5x)</li>
-                <li onclick="resizeSelectedToken(1.0)">Средний (1x)</li>
-                <li onclick="resizeSelectedToken(2.0)">Большой (2x)</li>
-                <li onclick="resizeSelectedToken(3.0)">Огромный (3x)</li>
-                <li onclick="resizeSelectedToken(4.0)">Гигантский (4x)</li>
+                <li data-action="resize-token" data-value="0.5">Крошечный (0.5x)</li>
+                <li data-action="resize-token" data-value="1.0">Средний (1x)</li>
+                <li data-action="resize-token" data-value="2.0">Большой (2x)</li>
+                <li data-action="resize-token" data-value="3.0">Огромный (3x)</li>
+                <li data-action="resize-token" data-value="4.0">Гигантский (4x)</li>
             </ul>
         </li>
-        <li onclick="deleteSelectedToken()" style="color: var(--accent-color);">❌ Удалить токен</li>
+        <li>
+            <span>🔄 Повернуть</span>
+            <span class="arrow">▶</span>
+            <ul class="ctx-submenu">
+                <li data-action="rotate-token" data-value="-90">Влево (90°)</li>
+                <li data-action="rotate-token" data-value="90">Вправо (90°)</li>
+                <li data-action="rotate-token" data-value="180">На 180°</li>
+                <li data-action="rotate-token" data-value="0">Сбросить</li>
+            </ul>
+        </li>
+        <li>
+            <span>✨ Статусы</span>
+            <span class="arrow">▶</span>
+            <ul class="ctx-submenu">
+                <li data-action="toggle-status" data-status="🔥">🔥 Горит</li>
+                <li data-action="toggle-status" data-status="🤢">🤢 Отравлен</li>
+                <li data-action="toggle-status" data-status="🕶️">🕶️ Ослеплён</li>
+                <li data-action="toggle-status" data-status="🧎">🧎 Сбит с ног</li>
+                <li data-action="toggle-status" data-status="❄️">❄️ Заморожен</li>
+                <li data-action="toggle-status" data-status="😴">😴 Без сознания</li>
+                <li data-action="toggle-status" data-status="🛡️">🛡️ Концентрация</li>
+                <li data-action="toggle-status" data-status="⚡">⚡ Заряжен</li>
+                <li data-action="clear-statuses">✖ Снять все</li>
+            </ul>
+        </li>
+        <li id="token-menu-initiative">⚔️ В инициативу</li>
+        <li data-action="delete-token" style="color: var(--accent-color);">❌ Удалить токен</li>
     </ul>
 
     <ul class="ctx-menu-list" id="fog-ctx-menu">
-        <li onclick="toggleFogVisibility()">👁️ Скрыть / Показать туман</li>
-        <li onclick="deleteSelectedFog()" style="color: var(--accent-color);">❌ Удалить зону тумана</li>
+        <li data-action="toggle-fog-visibility">👁️ Скрыть / Показать туман</li>
+        <li data-action="delete-fog" style="color: var(--accent-color);">❌ Удалить зону тумана</li>
     </ul>
 
-    <script>
-        // --- СТРУКТУРА ДАННЫХ ---
-        // Каждой локации по умолчанию задаем индивидуальные свойства zoomLevel, offsetX, offsetY
-        let adventureData = {
-            locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50 }],
-            currentLocationId: 1,
-            library: [
-                { id: 101, name: "Локации", type: 'folder', collapsed: false, children: [] },
-                { id: 102, name: "Токены NPC", type: 'folder', collapsed: false, children: [] }
-            ] 
-        };
-        
-        let currentMode = 'move';
-        let zoomLevel = 1.0;
-        let offsetX = 50, offsetY = 50;
-        const cellSize = 50; 
-        let isGridEnabled = false; 
-        let gridOpacity = 0.4;
-        let gridColor = 'white';
-        const rulerSize = 24;
+<script>
+// ============================================================
+//  INLINE PROMPT — custom dialog that works in fullscreen
+// ============================================================
+function showInlinePrompt(label, defaultVal, onConfirm) {
+    // Remove any existing prompt
+    const old = document.getElementById('inline-prompt-overlay');
+    if (old) old.remove();
 
-        let currentBrushColor = '#ff4a4a';
-        let currentBrushSize = 6;
-        let isDrawingNow = false;
-        let currentLine = null;
-        
-        let currentFogColor = '#000000';
-        let currentFogSize = 60;
-        let currentFogOpacity = 1.0;
-        let isDrawingFog = false;
-        let currentFogArea = null;
+    const overlay = document.createElement('div');
+    overlay.id = 'inline-prompt-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
 
-        let menuTargetTokenIndex = null;
-        let menuTargetFogIndex = null;
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#24242d;border:1px solid #383842;border-radius:8px;padding:20px;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.7);';
 
-        const snippingColors = [
-            '#000000', '#ffffff', '#7f7f7f', '#a3a3a3', '#d6d6d6', '#ececec',
-            '#ff007f', '#ff4a4a', '#ff7f00', '#ffc107', '#ffeb3b', '#ffff8d',
-            '#aeea00', '#00e676', '#00b0ff', '#29b6f6', '#2979ff', '#651fff',
-            '#aa00ff', '#d500f9', '#f8bbd0', '#ffccbc', '#bcaaa4', '#8d6e63',
-            '#f48fb1', '#ffab91', '#ffe082', '#e6ee9c', '#81c784', '#4fc3f7',
-            '#7986cb', '#b39ddb', '#e0e0e0', '#a1887f', '#4e342e', '#212121'
-        ];
+    const lbl = document.createElement('div');
+    lbl.textContent = label;
+    lbl.style.cssText = 'font-size:13px;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;';
 
-        let imageCache = new Map();
-        let isDraggingToken = false, isPanningMap = false;
-        let draggedTokenIndex = null;
-        let startX, startY;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultVal;
+    input.style.cssText = 'width:100%;background:#14141a;border:1px solid #383842;color:#e3e3e6;padding:8px 10px;border-radius:4px;font-size:14px;outline:none;margin-bottom:14px;';
 
-        const canvas = document.getElementById('game-canvas');
-        const ctx = canvas.getContext('2d');
-        const dropZone = document.getElementById('drop-zone');
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
 
-        function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
-            drawCanvas();
+    const cancel = document.createElement('button');
+    cancel.textContent = 'Отмена';
+    cancel.style.cssText = 'background:#32323d;border:1px solid #383842;color:#aaa;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;';
+
+    const confirm = document.createElement('button');
+    confirm.textContent = 'OK';
+    confirm.style.cssText = 'background:#ff4a4a;border:none;color:white;padding:6px 14px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:13px;';
+
+    const close = () => overlay.remove();
+    cancel.addEventListener('click', close);
+    confirm.addEventListener('click', () => { onConfirm(input.value); close(); });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { onConfirm(input.value); close(); }
+        if (e.key === 'Escape') close();
+    });
+    // Prevent clicks inside box from bubbling to overlay
+    box.addEventListener('click', (e) => e.stopPropagation());
+    overlay.addEventListener('click', close);
+
+    btns.appendChild(cancel); btns.appendChild(confirm);
+    box.appendChild(lbl); box.appendChild(input); box.appendChild(btns);
+    overlay.appendChild(box);
+    // Attach to fullscreen element if active, else body
+    (document.fullscreenElement || document.body).appendChild(overlay);
+    setTimeout(() => { input.select(); input.focus(); }, 0);
+}
+
+// ============================================================
+//  STATE — централизованное хранилище
+// ============================================================
+const state = {
+    adventureData: {
+        locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50 }],
+        currentLocationId: 1,
+        library: [
+            { id: 102, name: "Токены NPC", type: 'folder', collapsed: false, children: [] }
+        ]
+    },
+    currentMode: 'move',
+    zoomLevel: 1.0,
+    offsetX: 50,
+    offsetY: 50,
+    cellSize: 50,
+    isGridEnabled: false,
+    gridOpacity: 0.4,
+    gridColor: 'white',
+    rulerSize: 24,
+    currentBrushColor: '#ff4a4a',
+    currentBrushSize: 6,
+    isDrawingNow: false,
+    currentLine: null,
+    currentFogColor: '#000000',
+    currentFogSize: 60,
+    currentFogOpacity: 1.0,
+    currentFogMode: 'brush',       // 'brush' | 'polygon' | 'rect'
+    isDrawingFog: false,
+    currentFogArea: null,
+    fogPolygonPoints: [],           // polygon mode: accumulated click points
+    fogRectStart: null,             // rect mode: drag start point
+    fogRectPreview: null,           // rect mode: current drag end for preview
+    menuTargetTokenIndex: null,
+    menuTargetFogIndex: null,
+    // Initiative tracker
+    initiative: {
+        combatants: [],             // [{id, name, init, hp, tokenRef}]
+        currentIndex: -1,
+        round: 1,
+    },
+    snippingColors: [
+        '#000000','#ffffff','#7f7f7f','#a3a3a3','#d6d6d6','#ececec',
+        '#ff007f','#ff4a4a','#ff7f00','#ffc107','#ffeb3b','#ffff8d',
+        '#aeea00','#00e676','#00b0ff','#29b6f6','#2979ff','#651fff',
+        '#aa00ff','#d500f9','#f8bbd0','#ffccbc','#bcaaa4','#8d6e63',
+        '#f48fb1','#ffab91','#ffe082','#e6ee9c','#81c784','#4fc3f7',
+        '#7986cb','#b39ddb','#e0e0e0','#a1887f','#4e342e','#212121'
+    ],
+    imageCache: new Map(),
+    isDraggingToken: false,
+    isPanningMap: false,
+    draggedTokenIndex: null,
+    startX: 0,
+    startY: 0,
+    rulerStartPoint: null,
+    rulerEndPoint: null,
+    // Undo/Redo
+    drawingHistory: [],
+    drawingHistoryIndex: -1,
+    // Pings
+    pings: [],  // [{x, y, startTime, color}]
+    _pingAnimFrame: null,
+    // Selection
+    selectedTokenIds: new Set(),
+    isSelecting: false,
+    selectRect: null,
+    isDraggingSelection: false,
+    selectionDragStart: null,
+    selectionTokenStartPos: [],
+    // Clipboard
+    clipboard: [],
+};
+
+// EventEmitter
+const _events = {};
+const on  = (ev, fn) => { (_events[ev] || (_events[ev] = [])).push(fn); };
+const emit = (ev, d) => { (_events[ev] || []).forEach(fn => fn(d)); };
+
+// Геттеры
+const getCurrentLocation = () => state.adventureData.locations.find(l => l.id === state.adventureData.currentLocationId);
+
+// Мутации — без промежуточного слоя, для простоты напрямую меняем state и emit
+function setZoomLevel(level) {
+    state.zoomLevel = Math.max(0.2, Math.min(5.0, level));
+    emit('zoom:change', state.zoomLevel);
+}
+function setOffset(x, y) { state.offsetX = x; state.offsetY = y; emit('offset:change'); }
+function changeZoom(amount, mouseX, mouseY) {
+    const oldZoom = state.zoomLevel;
+    const newZoom = Math.max(0.2, Math.min(5.0, oldZoom + amount));
+    if (mouseX !== undefined && mouseY !== undefined) {
+        state.offsetX = mouseX - (mouseX - state.offsetX) * (newZoom / oldZoom);
+        state.offsetY = mouseY - (mouseY - state.offsetY) * (newZoom / oldZoom);
+    }
+    state.zoomLevel = newZoom;
+    emit('zoom:change', state.zoomLevel);
+    emit('offset:change');
+}
+function resetZoomAndOffset() {
+    state.zoomLevel = 1.0; state.offsetX = 50; state.offsetY = 50;
+    const loc = getCurrentLocation();
+    if (loc) { loc.zoomLevel = 1.0; loc.offsetX = 50; loc.offsetY = 50; }
+    emit('zoom:change', state.zoomLevel); emit('offset:change'); emit('canvas:redraw');
+}
+function toggleGrid() { state.isGridEnabled = !state.isGridEnabled; emit('grid:change'); emit('canvas:redraw'); }
+function setGridOpacity(v) { state.gridOpacity = v / 100; emit('grid:change'); emit('canvas:redraw'); }
+function toggleGridColor() {
+    state.gridColor = state.gridColor === 'white' ? 'black' : 'white';
+    document.getElementById('grid-color-toggle').innerText = `🎨 ${state.gridColor === 'white' ? 'Белая' : 'Черная'}`;
+    emit('grid:change'); emit('canvas:redraw');
+}
+function setCurrentMode(mode) { state.currentMode = mode; emit('mode:change', mode); }
+function syncCurrentLocationState() {
+    const loc = getCurrentLocation();
+    if (loc) { loc.zoomLevel = state.zoomLevel; loc.offsetX = state.offsetX; loc.offsetY = state.offsetY; }
+}
+function setCurrentLocationId(id) {
+    const old = getCurrentLocation();
+    if (old) { old.zoomLevel = state.zoomLevel; old.offsetX = state.offsetX; old.offsetY = state.offsetY; }
+    state.adventureData.currentLocationId = id;
+    const newLoc = getCurrentLocation();
+    if (newLoc) {
+        state.zoomLevel = newLoc.zoomLevel !== undefined ? newLoc.zoomLevel : 1.0;
+        state.offsetX   = newLoc.offsetX   !== undefined ? newLoc.offsetX   : 50;
+        state.offsetY   = newLoc.offsetY   !== undefined ? newLoc.offsetY   : 50;
+    }
+    emit('zoom:change', state.zoomLevel); emit('locations:update'); emit('canvas:redraw');
+}
+function addLocation(name) {
+    const loc = { id: Date.now(), name, bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50 };
+    state.adventureData.locations.push(loc);
+    emit('locations:update');
+}
+function deleteLocation(id) {
+    if (state.adventureData.locations.length <= 1) return;
+    state.adventureData.locations = state.adventureData.locations.filter(l => l.id !== id);
+    if (state.adventureData.currentLocationId === id) setCurrentLocationId(state.adventureData.locations[0].id);
+    else { emit('locations:update'); emit('canvas:redraw'); }
+}
+function addLibraryFolder(name) {
+    state.adventureData.library.push({ id: Date.now(), name, type: 'folder', collapsed: false, children: [] });
+    emit('library:update');
+}
+function toggleLibraryFolder(id) {
+    const f = state.adventureData.library.find(f => f.id === id);
+    if (f) { f.collapsed = !f.collapsed; emit('library:update'); }
+}
+function deleteLibraryFolder(id) {
+    state.adventureData.library = state.adventureData.library.filter(f => f.id !== id);
+    emit('library:update');
+}
+function addFileToFolder(folderId, fileData) {
+    const f = state.adventureData.library.find(f => f.id === folderId);
+    if (f) { f.children.push({ id: Date.now() + Math.random(), name: fileData.name, data: fileData.data }); emit('library:update'); }
+}
+function deleteFileFromFolder(folderId, fileId) {
+    const f = state.adventureData.library.find(f => f.id === folderId);
+    if (f) { f.children = f.children.filter(c => c.id !== fileId); emit('library:update'); }
+}
+function addTokenToCurrentLocation(tokenData) {
+    const loc = getCurrentLocation();
+    if (loc) { loc.tokens.push(tokenData); pushHistory(); emit('canvas:redraw'); }
+}
+function setCurrentBackground(imageData) {
+    const loc = getCurrentLocation();
+    if (loc) { loc.bgData = imageData; state.imageCache.delete(`bg_${loc.id}`); pushHistory(); emit('canvas:redraw'); }
+}
+function resizeSelectedToken(multiplier) {
+    const loc = getCurrentLocation();
+    if (loc && state.menuTargetTokenIndex !== null && loc.tokens[state.menuTargetTokenIndex]) {
+        loc.tokens[state.menuTargetTokenIndex].radius = 25 * multiplier;
+        pushHistory(); emit('canvas:redraw');
+    }
+}
+function rotateSelectedToken(angle) {
+    const loc = getCurrentLocation();
+    if (loc && state.menuTargetTokenIndex !== null && loc.tokens[state.menuTargetTokenIndex]) {
+        const t = loc.tokens[state.menuTargetTokenIndex];
+        if (angle === 0) { t.rotation = 0; }
+        else { t.rotation = ((t.rotation || 0) + angle) % 360; if (t.rotation < 0) t.rotation += 360; }
+        pushHistory(); emit('canvas:redraw');
+    }
+}
+function editTokenName() {
+    const loc = getCurrentLocation();
+    if (!loc || state.menuTargetTokenIndex === null || !loc.tokens[state.menuTargetTokenIndex]) return;
+    const t = loc.tokens[state.menuTargetTokenIndex];
+    showInlinePrompt("Имя токена", t.name || "", (val) => {
+        t.name = val; pushHistory(); emit('canvas:redraw');
+    });
+}
+function editTokenHP() {
+    const loc = getCurrentLocation();
+    if (!loc || state.menuTargetTokenIndex === null || !loc.tokens[state.menuTargetTokenIndex]) return;
+    const t = loc.tokens[state.menuTargetTokenIndex];
+    showInlinePrompt("HP токена", t.hp !== undefined ? String(t.hp) : "", (val) => {
+        t.hp = val === "" ? undefined : parseInt(val);
+        pushHistory(); emit('canvas:redraw');
+    });
+}
+function deleteSelectedToken() {
+    const loc = getCurrentLocation();
+    if (loc && state.menuTargetTokenIndex !== null) {
+        loc.tokens.splice(state.menuTargetTokenIndex, 1);
+        state.menuTargetTokenIndex = null;
+        pushHistory(); emit('canvas:redraw');
+    }
+}
+function toggleFogAreaVisibility() {
+    const loc = getCurrentLocation();
+    if (loc && loc.fog && state.menuTargetFogIndex !== null) {
+        loc.fog[state.menuTargetFogIndex].hidden = !loc.fog[state.menuTargetFogIndex].hidden;
+        pushHistory(); emit('canvas:redraw');
+    }
+}
+function deleteSelectedFog() {
+    const loc = getCurrentLocation();
+    if (loc && loc.fog && state.menuTargetFogIndex !== null) {
+        loc.fog.splice(state.menuTargetFogIndex, 1);
+        state.menuTargetFogIndex = null;
+        pushHistory(); emit('canvas:redraw');
+    }
+}
+
+// ============================================================
+//  UNDO / REDO
+// ============================================================
+function pushHistory() {
+    const loc = getCurrentLocation();
+    if (!loc) return;
+    const snap = JSON.stringify({ tokens: loc.tokens, drawings: loc.drawings, fog: loc.fog });
+    if (state.drawingHistoryIndex < state.drawingHistory.length - 1) {
+        state.drawingHistory = state.drawingHistory.slice(0, state.drawingHistoryIndex + 1);
+    }
+    state.drawingHistory.push(snap);
+    if (state.drawingHistory.length > 50) state.drawingHistory.shift();
+    else state.drawingHistoryIndex++;
+    updateUndoRedoButtons();
+}
+function undo() {
+    if (state.drawingHistoryIndex <= 0) return;
+    state.drawingHistoryIndex--;
+    restoreHistory(state.drawingHistory[state.drawingHistoryIndex]);
+}
+function redo() {
+    if (state.drawingHistoryIndex >= state.drawingHistory.length - 1) return;
+    state.drawingHistoryIndex++;
+    restoreHistory(state.drawingHistory[state.drawingHistoryIndex]);
+}
+function restoreHistory(snap) {
+    const loc = getCurrentLocation();
+    if (!loc || !snap) return;
+    const data = JSON.parse(snap);
+    loc.tokens = data.tokens; loc.drawings = data.drawings; loc.fog = data.fog;
+    state.imageCache.clear();
+    updateUndoRedoButtons();
+    emit('canvas:redraw');
+}
+function updateUndoRedoButtons() {
+    document.getElementById('btn-undo').disabled = state.drawingHistoryIndex <= 0;
+    document.getElementById('btn-redo').disabled = state.drawingHistoryIndex >= state.drawingHistory.length - 1;
+}
+
+// ============================================================
+//  IMAGE LOADER
+// ============================================================
+function loadImage(src, cacheKey) {
+    if (state.imageCache.has(cacheKey)) return Promise.resolve(state.imageCache.get(cacheKey));
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => { state.imageCache.set(cacheKey, img); resolve(img); };
+        img.onerror = (e) => reject(new Error(`Failed to load image: ${src}`));
+    });
+}
+
+// ============================================================
+//  CANVAS RENDERER
+// ============================================================
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width  = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight;
+    drawCanvas();
+}
+window.addEventListener('resize', resizeCanvas);
+
+async function drawCanvas() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#0d0d11";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const loc = getCurrentLocation();
+    if (!loc) return;
+
+    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    let mapW = canvas.width, mapH = canvas.height;
+
+    const drawLayers = async (mw, mh) => {
+        if (state.isGridEnabled) drawTacticalGrid(mw, mh, z, ox, oy);
+        drawVectorDrawings(loc.drawings, z, ox, oy);
+        await drawTokens(loc.tokens, z, ox, oy);
+        drawInitiativeHighlight(loc.tokens, z, ox, oy);
+        drawFogOfWar(loc.fog, z, ox, oy);
+        drawRuler(z, ox, oy);
+        drawPings(z, ox, oy);
+        drawSelectionOverlay(z, ox, oy);
+        drawDynamicRulers(mw, mh, z, ox, oy);
+    };
+
+    if (loc.bgData) {
+        try {
+            const img = await loadImage(loc.bgData, `bg_${loc.id}`);
+            mapW = img.width; mapH = img.height;
+            ctx.drawImage(img, ox, oy, mapW * z, mapH * z);
+            await drawLayers(mapW, mapH);
+        } catch {
+            drawFallback(loc.name);
+            await drawLayers(mapW, mapH);
         }
-        window.addEventListener('resize', resizeCanvas);
+    } else {
+        drawFallback(loc.name);
+        await drawLayers(mapW, mapH);
+    }
+}
 
-        function initMenus() {
-            const brushColorsGrid = document.getElementById('brush-colors');
-            brushColorsGrid.innerHTML = '';
-            snippingColors.forEach(color => {
-                const circle = document.createElement('div');
-                circle.className = 'color-circle' + (color === currentBrushColor ? ' selected' : '');
-                circle.style.backgroundColor = color;
-                circle.onclick = (e) => {
-                    e.stopPropagation();
-                    brushColorsGrid.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
-                    circle.classList.add('selected');
-                    currentBrushColor = color;
-                    renderBrushPreview();
-                };
-                brushColorsGrid.appendChild(circle);
-            });
+function drawFallback(name) {
+    ctx.fillStyle = "#444"; ctx.font = "16px Arial"; ctx.textAlign = "center";
+    ctx.fillText(`📍 Локация без карты: ${name}`, canvas.width / 2, canvas.height / 2);
+}
 
-            const fogColorsGrid = document.getElementById('fog-colors');
-            fogColorsGrid.innerHTML = '';
-            snippingColors.forEach(color => {
-                const circle = document.createElement('div');
-                circle.className = 'color-circle' + (color === currentFogColor ? ' selected' : '');
-                circle.style.backgroundColor = color;
-                circle.onclick = (e) => {
-                    e.stopPropagation();
-                    fogColorsGrid.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
-                    circle.classList.add('selected');
-                    currentFogColor = color;
-                    renderFogPreview();
-                };
-                fogColorsGrid.appendChild(circle);
-            });
+function drawTacticalGrid(mw, mh, z, ox, oy) {
+    const sc = state.cellSize * z;
+    const sx = ox % sc, sy = oy % sc;
+    ctx.save();
+    ctx.strokeStyle = state.gridColor === 'white' ? `rgba(255,255,255,${state.gridOpacity})` : `rgba(0,0,0,${state.gridOpacity})`;
+    ctx.lineWidth = 1;
+    for (let x = sx; x < canvas.width; x += sc) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+    for (let y = sy; y < canvas.height; y += sc) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+    ctx.restore();
+}
 
-            renderBrushPreview();
-            renderFogPreview();
-        }
+function drawVectorDrawings(drawings, z, ox, oy) {
+    if (!drawings) return;
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    drawings.forEach(line => {
+        if (line.points.length < 2) return;
+        ctx.beginPath(); ctx.strokeStyle = line.color; ctx.lineWidth = line.size * z;
+        ctx.moveTo(line.points[0].x * z + ox, line.points[0].y * z + oy);
+        for (let i = 1; i < line.points.length; i++) ctx.lineTo(line.points[i].x * z + ox, line.points[i].y * z + oy);
+        ctx.stroke();
+    });
+    ctx.restore();
+}
 
-        function updateBrushSize(val) { currentBrushSize = parseInt(val); renderBrushPreview(); }
-        function renderBrushPreview() {
-            const pCanvas = document.getElementById('brush-preview'); const pCtx = pCanvas.getContext('2d');
-            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height); pCtx.beginPath();
-            pCtx.moveTo(20, pCanvas.height / 2); pCtx.bezierCurveTo(60, 5, 180, 55, 220, pCanvas.height / 2);
-            pCtx.strokeStyle = currentBrushColor; pCtx.lineWidth = Math.min(currentBrushSize, 20); pCtx.lineCap = 'round'; pCtx.stroke();
-        }
+function drawFogOfWar(fogList, z, ox, oy) {
+    if (!fogList) return;
+    ctx.save();
 
-        function updateFogSize(val) { currentFogSize = parseInt(val); renderFogPreview(); }
-        function updateFogOpacity(val) { 
-            currentFogOpacity = val / 100; 
-            document.getElementById('fog-opacity-text').innerText = `Плотность (Сила): ${val}%`;
-            renderFogPreview(); 
-        }
-        function renderFogPreview() {
-            const pCanvas = document.getElementById('fog-preview'); const pCtx = pCanvas.getContext('2d');
-            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height); pCtx.beginPath();
-            pCtx.moveTo(20, pCanvas.height / 2); pCtx.bezierCurveTo(60, 5, 180, 55, 220, pCanvas.height / 2);
-            pCtx.strokeStyle = currentFogColor;
-            pCtx.globalAlpha = currentFogOpacity;
-            pCtx.lineWidth = Math.max(4, Math.min(currentFogSize / 4, 25)); 
-            pCtx.lineCap = 'round'; pCtx.stroke();
-            pCtx.globalAlpha = 1.0;
-        }
+    fogList.forEach(area => {
+        if (!area.points || area.points.length < 1) return;
+        ctx.save();
 
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            const activeBtn = document.getElementById(`btn-mode-${mode}`);
-            if(activeBtn) activeBtn.classList.add('active');
-            document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
-            document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
-        }
-
-        window.addEventListener('click', (e) => {
-            if (!e.target.closest('.mode-container')) {
-                if (currentMode !== 'draw') document.getElementById('drawing-menu').classList.remove('show');
-                if (currentMode !== 'fog') document.getElementById('fog-menu-popup').classList.remove('show');
-            }
-            document.getElementById('token-menu').style.display = 'none';
-            document.getElementById('fog-ctx-menu').style.display = 'none';
-        });
-
-        function toggleGrid() { isGridEnabled = !isGridEnabled; document.getElementById('grid-toggle').classList.toggle('active', isGridEnabled); drawCanvas(); }
-        function changeGridOpacity(val) { gridOpacity = val / 100; drawCanvas(); }
-        function toggleGridColor() {
-            gridColor = (gridColor === 'white') ? 'black' : 'white';
-            document.getElementById('grid-color-toggle').innerText = `🎨 ${gridColor === 'white' ? 'Белая' : 'Черная'}`;
-            drawCanvas();
-        }
-        function changeZoom(amount) { 
-            zoomLevel = Math.max(0.2, Math.min(5.0, zoomLevel + amount)); 
-            document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`; 
-            drawCanvas(); 
-        }
-        function resetZoom() { zoomLevel = 1.0; offsetX = 50; offsetY = 50; document.getElementById('zoom-text').innerText = "100%"; drawCanvas(); }
-        function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else document.exitFullscreen(); }
-        function switchTab(tabName, btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); btn.classList.add('active'); document.getElementById(`tab-${tabName}`).classList.add('active'); }
-
-        // --- УПРАВЛЕНИЕ ТОКЕНАМИ И МАСШТАБОМ ---
-        function resizeSelectedToken(multiplier) {
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (currentLoc && menuTargetTokenIndex !== null && currentLoc.tokens[menuTargetTokenIndex]) {
-                currentLoc.tokens[menuTargetTokenIndex].radius = 25 * multiplier;
-                drawCanvas();
-            }
-        }
-
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const canvasX = e.clientX - rect.left;
-            const canvasY = e.clientY - rect.top;
-            const mapX = (canvasX - offsetX) / zoomLevel;
-            const mapY = (canvasY - offsetY) / zoomLevel;
-
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (!currentLoc) return;
-
-            if (e.button === 1) {
-                isPanningMap = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY; canvas.style.cursor = 'grabbing'; return;
-            }
-
-            if (e.button === 0) {
-                if (currentMode === 'draw') {
-                    isDrawingNow = true;
-                    currentLine = { color: currentBrushColor, size: currentBrushSize, points: [{x: mapX, y: mapY}] };
-                    currentLoc.drawings.push(currentLine);
-                    return;
-                }
-                if (currentMode === 'fog') {
-                    isDrawingFog = true;
-                    currentFogArea = { id: Date.now(), hidden: false, color: currentFogColor, size: currentFogSize, opacity: currentFogOpacity, points: [{x: mapX, y: mapY}] };
-                    if (!currentLoc.fog) currentLoc.fog = [];
-                    currentLoc.fog.push(currentFogArea);
-                    return;
-                }
-                if (currentMode === 'eraser') {
-                    currentLoc.drawings = currentLoc.drawings.filter(line => !line.points.some(p => Math.hypot(p.x - mapX, p.y - mapY) < (line.size + 10) / zoomLevel));
-                    drawCanvas();
-                    return;
-                }
-                if (currentMode === 'move') {
-                    for (let i = currentLoc.tokens.length - 1; i >= 0; i--) {
-                        const t = currentLoc.tokens[i];
-                        if (Math.hypot(canvasX - (t.x * zoomLevel + offsetX), canvasY - (t.y * zoomLevel + offsetY)) <= t.radius * zoomLevel) {
-                            isDraggingToken = true; draggedTokenIndex = i; canvas.style.cursor = 'move'; return;
-                        }
-                    }
-                    isPanningMap = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY; canvas.style.cursor = 'grabbing';
-                }
-            }
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mapX = (e.clientX - rect.left - offsetX) / zoomLevel;
-            const mapY = (e.clientY - rect.top - offsetY) / zoomLevel;
-
-            if (isPanningMap) { offsetX = e.clientX - startX; offsetY = e.clientY - startY; drawCanvas(); return; }
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (!currentLoc) return;
-
-            if (currentMode === 'draw' && isDrawingNow && currentLine) { currentLine.points.push({x: mapX, y: mapY}); drawCanvas(); return; }
-            if (currentMode === 'fog' && isDrawingFog && currentFogArea) { currentFogArea.points.push({x: mapX, y: mapY}); drawCanvas(); return; }
-            if (isDraggingToken && draggedTokenIndex !== null && currentLoc.tokens[draggedTokenIndex]) {
-                currentLoc.tokens[draggedTokenIndex].x = mapX; currentLoc.tokens[draggedTokenIndex].y = mapY; drawCanvas();
-            }
-        });
-
-        window.addEventListener('mouseup', () => {
-            isDrawingNow = false; isDrawingFog = false; isPanningMap = false; isDraggingToken = false;
-            currentLine = null; currentFogArea = null; draggedTokenIndex = null; canvas.style.cursor = 'default';
-        });
-
-        canvas.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const canvasX = e.clientX - rect.left;
-            const canvasY = e.clientY - rect.top;
-            const mapX = (canvasX - offsetX) / zoomLevel;
-            const mapY = (canvasY - offsetY) / zoomLevel;
-            
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (!currentLoc) return;
-
-            document.getElementById('token-menu').style.display = 'none';
-            document.getElementById('fog-ctx-menu').style.display = 'none';
-
-            for (let i = currentLoc.tokens.length - 1; i >= 0; i--) {
-                const t = currentLoc.tokens[i];
-                if (Math.hypot(canvasX - (t.x * zoomLevel + offsetX), canvasY - (t.y * zoomLevel + offsetY)) <= t.radius * zoomLevel) {
-                    menuTargetTokenIndex = i;
-                    const menu = document.getElementById('token-menu');
-                    menu.style.display = 'block'; menu.style.left = `${e.pageX}px`; menu.style.top = `${e.pageY}px`;
-                    return;
-                }
-            }
-
-            if (currentLoc.fog) {
-                for (let i = currentLoc.fog.length - 1; i >= 0; i--) {
-                    const area = currentLoc.fog[i];
-                    if (area.points.some(p => Math.hypot(p.x - mapX, p.y - mapY) < (area.size / 2) / zoomLevel)) {
-                        menuTargetFogIndex = i;
-                        const menu = document.getElementById('fog-ctx-menu');
-                        menu.style.display = 'block'; menu.style.left = `${e.pageX}px`; menu.style.top = `${e.pageY}px`;
-                        return;
-                    }
-                }
-            }
-        });
-
-        function toggleFogVisibility() {
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (currentLoc && currentLoc.fog && menuTargetFogIndex !== null) { currentLoc.fog[menuTargetFogIndex].hidden = !currentLoc.fog[menuTargetFogIndex].hidden; drawCanvas(); }
-        }
-        function deleteSelectedFog() {
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (currentLoc && currentLoc.fog && menuTargetFogIndex !== null) { currentLoc.fog.splice(menuTargetFogIndex, 1); drawCanvas(); }
-        }
-        function deleteSelectedToken() {
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (currentLoc && menuTargetTokenIndex !== null) { currentLoc.tokens.splice(menuTargetTokenIndex, 1); drawCanvas(); }
-        }
-
-        // --- СЛОИ ОТРИСОВКИ ХОЛСТА ---
-        function drawCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#0d0d11"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (!currentLoc) return;
-
-            let mapW = canvas.width; let mapH = canvas.height;
-
-            if (currentLoc.bgData) {
-                const cacheKey = `bg_${currentLoc.id}`;
-                const renderBackground = (imgObj) => {
-                    mapW = imgObj.width; mapH = imgObj.height;
-                    ctx.drawImage(imgObj, offsetX, offsetY, mapW * zoomLevel, mapH * zoomLevel);
-                    if (isGridEnabled) drawTacticalGrid(mapW, mapH);
-                    drawVectorDrawings(currentLoc.drawings);
-                    drawTokens(currentLoc.tokens);
-                    drawFogOfWar(currentLoc.fog);
-                    drawDynamicRulers(mapW, mapH);
-                };
-                if (imageCache.has(cacheKey)) { renderBackground(imageCache.get(cacheKey)); } 
-                else { const img = new Image(); img.src = currentLoc.bgData; img.onload = function() { imageCache.set(cacheKey, img); renderBackground(img); }; }
-            } else {
-                if (isGridEnabled) drawTacticalGrid(canvas.width, canvas.height);
-                drawVectorDrawings(currentLoc.drawings);
-                drawTokens(currentLoc.tokens);
-                drawFogOfWar(currentLoc.fog);
-                ctx.fillStyle = "#444"; ctx.font = "16px Arial"; ctx.textAlign = "center";
-                ctx.fillText(`📍 Локация без карты: ${currentLoc.name}`, canvas.width / 2, canvas.height / 2);
-                drawDynamicRulers(canvas.width, canvas.height);
-            }
-        }
-
-        function drawVectorDrawings(drawings) {
-            if (!drawings) return;
-            ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            drawings.forEach(line => {
-                if (line.points.length < 2) return;
-                ctx.beginPath(); ctx.strokeStyle = line.color; ctx.lineWidth = line.size * zoomLevel;
-                ctx.moveTo(line.points[0].x * zoomLevel + offsetX, line.points[0].y * zoomLevel + offsetY);
-                for(let i = 1; i < line.points.length; i++) { ctx.lineTo(line.points[i].x * zoomLevel + offsetX, line.points[i].y * zoomLevel + offsetY); }
-                ctx.stroke();
-            });
-            ctx.restore();
-        }
-
-        function drawFogOfWar(fogList) {
-            if (!fogList) return;
-            ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            fogList.forEach(area => {
-                if (area.points.length < 2) return;
+        if (area.hidden) {
+            // Dotted outline — "hidden" fog zone visible to DM only
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            const type = area.type || 'brush';
+            if (type === 'polygon' || type === 'rect') {
                 ctx.beginPath();
-                if (area.hidden) {
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
-                } else {
-                    let r = 0, g = 0, b = 0;
-                    if (area.color && area.color.startsWith('#')) {
-                        let c = area.color.substring(1);
-                        if(c.length === 6) { r = parseInt(c.substring(0,2), 16); g = parseInt(c.substring(2,4), 16); b = parseInt(c.substring(4,6), 16); }
-                    }
-                    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${area.opacity !== undefined ? area.opacity : 0.85})`;
-                    ctx.lineWidth = (area.size || 40) * zoomLevel; 
-                }
-                ctx.moveTo(area.points[0].x * zoomLevel + offsetX, area.points[0].y * zoomLevel + offsetY);
-                for(let i = 1; i < area.points.length; i++) { ctx.lineTo(area.points[i].x * zoomLevel + offsetX, area.points[i].y * zoomLevel + offsetY); }
-                ctx.stroke();
-            });
-            ctx.restore();
-        }
-
-        function drawTacticalGrid(width, height) {
-            const scaledCell = cellSize * zoomLevel;
-            const cols = Math.ceil(width / cellSize); const rows = Math.ceil(height / cellSize);
-            ctx.save(); ctx.strokeStyle = (gridColor === 'white') ? `rgba(255,255,255,${gridOpacity})` : `rgba(0,0,0,${gridOpacity})`; ctx.lineWidth = 1;
-            for (let i = 0; i <= cols; i++) { const x = offsetX + i * scaledCell; ctx.beginPath(); ctx.moveTo(x, offsetY); ctx.lineTo(x, offsetY + rows * scaledCell); ctx.stroke(); }
-            for (let j = 0; j <= rows; j++) { const y = offsetY + j * scaledCell; ctx.beginPath(); ctx.moveTo(offsetX, y); ctx.lineTo(offsetX + cols * scaledCell, y); ctx.stroke(); }
-            ctx.restore();
-        }
-
-        function drawDynamicRulers(mapWidth, mapHeight) {
-            ctx.save(); const scaledCell = cellSize * zoomLevel;
-            const cols = Math.ceil(mapWidth / cellSize); const rows = Math.ceil(mapHeight / cellSize);
-            ctx.fillStyle = "rgba(20, 20, 26, 0.95)"; ctx.fillRect(rulerSize, 0, canvas.width - rulerSize, rulerSize);
-            ctx.fillStyle = "#383842"; ctx.fillRect(rulerSize, rulerSize - 1, canvas.width - rulerSize, 1);
-            ctx.font = "bold 11px 'Segoe UI', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.save(); ctx.beginPath(); ctx.rect(rulerSize, 0, canvas.width - rulerSize, rulerSize); ctx.clip();
-            for (let i = 0; i < cols; i++) {
-                const cellCenter = offsetX + i * scaledCell + scaledCell / 2;
-                if (cellCenter > rulerSize && cellCenter < canvas.width) {
-                    ctx.fillStyle = "#ffd166"; ctx.fillText(getCharLabel(i), cellCenter, rulerSize / 2);
-                    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(offsetX + i * scaledCell, rulerSize - 6, 1, 6);
-                }
-            }
-            ctx.restore();
-            ctx.fillStyle = "rgba(20, 20, 26, 0.95)"; ctx.fillRect(0, rulerSize, rulerSize, canvas.height - rulerSize);
-            ctx.fillStyle = "#383842"; ctx.fillRect(rulerSize - 1, rulerSize, 1, canvas.height - rulerSize);
-            ctx.save(); ctx.beginPath(); ctx.rect(0, rulerSize, rulerSize, canvas.height - rulerSize); ctx.clip();
-            for (let j = 0; j < rows; j++) {
-                const cellCenter = offsetY + j * scaledCell + scaledCell / 2;
-                if (cellCenter > rulerSize && cellCenter < canvas.height) {
-                    ctx.fillStyle = "#ff4a4a"; ctx.fillText(j + 1, rulerSize / 2, cellCenter);
-                    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(rulerSize - 6, offsetY + j * scaledCell, 6, 1);
-                }
-            }
-            ctx.restore();
-            ctx.fillStyle = "#14141a"; ctx.fillRect(0, 0, rulerSize, rulerSize);
-            ctx.fillStyle = "#383842"; ctx.fillRect(rulerSize - 1, 0, 1, rulerSize); ctx.fillRect(0, rulerSize - 1, rulerSize, 1);
-            ctx.restore();
-        }
-
-        function getCharLabel(index) { let label = ''; while (index >= 0) { label = String.fromCharCode((index % 26) + 65) + label; index = Math.floor(index / 26) - 1; } return label; }
-
-        function drawTokens(tokens) {
-            tokens.forEach((token) => {
-                const cacheKey = `token_${token.id}`; 
-                const screenX = token.x * zoomLevel + offsetX; 
-                const screenY = token.y * zoomLevel + offsetY; 
-                const screenRadius = token.radius * zoomLevel;
-                
-                const renderCircularToken = (imgObj) => {
-                    ctx.save(); ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.clip();
-                    ctx.drawImage(imgObj, screenX - screenRadius, screenY - screenRadius, screenRadius * 2, screenRadius * 2); ctx.restore();
-                    ctx.beginPath(); ctx.arc(screenX, screenY, screenRadius, 0, Math.PI * 2); ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
-                };
-                if (imageCache.has(cacheKey)) { renderCircularToken(imageCache.get(cacheKey)); } 
-                else { const img = new Image(); img.src = token.src; img.onload = function() { imageCache.set(cacheKey, img); renderCircularToken(img); }; }
-            });
-        }
-
-        // --- ЛОКАЦИИ И БИБЛИОТЕКА ---
-        function renderLocations() {
-            const list = document.getElementById('location-list'); list.innerHTML = '';
-            adventureData.locations.forEach(loc => {
-                const li = document.createElement('li'); li.className = `tree-item ${loc.id === adventureData.currentLocationId ? 'folder-header' : ''}`;
-                if(loc.id === adventureData.currentLocationId) li.style.color = 'var(--accent-color)';
-                li.innerHTML = `<span onclick="selectLocation(${loc.id})">📍 ${loc.name}</span>
-                    ${adventureData.locations.length > 1 ? `<button class="delete-item" onclick="deleteLocation(${loc.id}, event)">×</button>` : ''}`;
-                list.appendChild(li);
-            });
-        }
-        
-        function addLocation() { 
-            let maxIndex = 0;
-            adventureData.locations.forEach(loc => {
-                const match = loc.name.match(/\d+/g);
-                if (match) {
-                    const val = parseInt(match[match.length - 1]);
-                    if (val > maxIndex) maxIndex = val;
-                }
-            });
-            
-            const nextName = `Локация ${maxIndex + 1}`;
-            const name = prompt("Название локации:", nextName); 
-            if (name) { 
-                adventureData.locations.push({ 
-                    id: Date.now(), 
-                    name: name, 
-                    bgData: null, 
-                    tokens: [], 
-                    drawings: [], 
-                    fog: [],
-                    zoomLevel: 1.0,
-                    offsetX: 50,
-                    offsetY: 50
-                }); 
-                renderLocations(); 
-                drawCanvas(); 
-            } 
-        }
-
-        function selectLocation(id) { 
-            // 1. Сохраняем положение камеры текущей активной локации перед уходом с нее
-            const oldLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (oldLoc) {
-                oldLoc.zoomLevel = zoomLevel;
-                oldLoc.offsetX = offsetX;
-                oldLoc.offsetY = offsetY;
-            }
-
-            // 2. Переключаем на новую локацию
-            adventureData.currentLocationId = id; 
-
-            // 3. Вытягиваем параметры камеры для новой локации
-            const newLoc = adventureData.locations.find(l => l.id === id);
-            if (newLoc) {
-                zoomLevel = newLoc.zoomLevel !== undefined ? newLoc.zoomLevel : 1.0;
-                offsetX = newLoc.offsetX !== undefined ? newLoc.offsetX : 50;
-                offsetY = newLoc.offsetY !== undefined ? newLoc.offsetY : 50;
-            }
-
-            // 4. Корректируем отображаемый процент зума
-            document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`;
-
-            renderLocations(); 
-            drawCanvas(); 
-        }
-
-        function deleteLocation(id, event) { event.stopPropagation(); if (adventureData.locations.length <= 1) return; adventureData.locations = adventureData.locations.filter(l => l.id !== id); if (adventureData.currentLocationId === id) selectLocation(adventureData.locations[0].id); else { renderLocations(); drawCanvas(); } }
-
-        document.getElementById('load-file').addEventListener('click', function() {
-            // Костыль, чтобы принудительно перезагружать один и тот же файл при разработке
-            this.value = null;
-        });
-
-        function createFolder() { const name = prompt("Название папки:"); if (name) { adventureData.library.push({ id: Date.now(), name: name, type: 'folder', collapsed: false, children: [] }); renderLibrary(); } }
-        function toggleFolder(id) { const folder = adventureData.library.find(f => f.id === id); if (folder) { folder.collapsed = !folder.collapsed; renderLibrary(); } }
-
-        // УДАЛЕНИЕ ПАПКИ С ФАЙЛАМИ
-        function deleteFolder(folderId, event) {
-            event.stopPropagation();
-            const folder = adventureData.library.find(f => f.id === folderId);
-            if (!folder) return;
-            
-            const msg = folder.children.length > 0 
-                ? `Удалить папку "${folder.name}" и все файлы внутри неё (${folder.children.length} шт.)?`
-                : `Удалить пустую папку "${folder.name}"?`;
-                
-            if (confirm(msg)) {
-                adventureData.library = adventureData.library.filter(f => f.id !== folderId);
-                renderLibrary();
-            }
-        }
-
-        // УДАЛЕНИЕ ОДНОГО ФАЙЛА ИЗ ПАПКИ
-        function deleteFile(folderId, fileId, event) {
-            event.stopPropagation();
-            const folder = adventureData.library.find(f => f.id === folderId);
-            if (folder) {
-                folder.children = folder.children.filter(file => file.id !== fileId);
-                renderLibrary();
-            }
-        }
-
-        function renderLibrary() {
-            const tree = document.getElementById('file-tree'); tree.innerHTML = '';
-            adventureData.library.forEach(folder => {
-                const folderDiv = document.createElement('div'); folderDiv.className = 'folder-container';
-                const headerEl = document.createElement('div'); headerEl.className = 'tree-item folder-header';
-                
-                const arrow = folder.collapsed ? '▶' : '▼';
-                headerEl.innerHTML = `<span onclick="toggleFolder(${folder.id})">${arrow} 📁 ${folder.name}</span>
-                    <button class="delete-item" onclick="deleteFolder(${folder.id}, event)">×</button>`;
-                
-                headerEl.addEventListener('dragenter', (e) => { e.preventDefault(); headerEl.classList.add('drag-over'); });
-                headerEl.addEventListener('dragover', (e) => e.preventDefault());
-                headerEl.addEventListener('dragleave', () => { headerEl.classList.remove('drag-over'); });
-                
-                headerEl.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    headerEl.classList.remove('drag-over');
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        for (let file of files) {
-                            const reader = new FileReader();
-                            reader.onload = function(ev) { folder.children.push({ id: Date.now()+Math.random(), name: file.name, data: ev.target.result }); renderLibrary(); };
-                            reader.readAsDataURL(file);
-                        }
-                    }
-                });
-                
-                const childrenUl = document.createElement('ul'); 
-                childrenUl.className = 'folder-children' + (folder.collapsed ? ' collapsed' : '');
-                
-                folder.children.forEach(file => {
-                    const fileLi = document.createElement('li'); fileLi.className = 'tree-item file-item'; fileLi.setAttribute('draggable', 'true');
-                    fileLi.innerHTML = `<span>🖼️ ${file.name}</span>
-                        <button class="delete-item" onclick="deleteFile(${folder.id}, ${file.id}, event)">×</button>`; 
-                    fileLi.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', file.data));
-                    childrenUl.appendChild(fileLi);
-                });
-                folderDiv.appendChild(headerEl); folderDiv.appendChild(childrenUl); tree.appendChild(folderDiv);
-            });
-        }
-
-        dropZone.addEventListener('dragover', (e) => e.preventDefault());
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault(); const internalData = e.dataTransfer.getData('text/plain');
-            const rect = canvas.getBoundingClientRect();
-            const mapX = (e.clientX - rect.left - offsetX) / zoomLevel; const mapY = (e.clientY - rect.top - offsetY) / zoomLevel;
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId); if (!currentLoc) return;
-
-            if (internalData) { 
-                currentLoc.tokens.push({ id: Date.now(), src: internalData, x: mapX, y: mapY, radius: 25 }); 
-                drawCanvas(); 
+                ctx.moveTo(area.points[0].x * z + ox, area.points[0].y * z + oy);
+                for (let i = 1; i < area.points.length; i++) ctx.lineTo(area.points[i].x * z + ox, area.points[i].y * z + oy);
+                ctx.closePath(); ctx.stroke();
             } else {
-                const files = e.dataTransfer.files;
-                if (files.length > 0) { const reader = new FileReader(); reader.onload = function(event) { currentLoc.bgData = event.target.result; imageCache.delete(`bg_${currentLoc.id}`); drawCanvas(); }; reader.readAsDataURL(files[0]); }
+                ctx.beginPath();
+                ctx.moveTo(area.points[0].x * z + ox, area.points[0].y * z + oy);
+                for (let i = 1; i < area.points.length; i++) ctx.lineTo(area.points[i].x * z + ox, area.points[i].y * z + oy);
+                ctx.stroke();
+            }
+        } else {
+            // Parse color
+            let r = 0, g = 0, b = 0;
+            if (area.color && area.color.startsWith('#') && area.color.length === 7) {
+                r = parseInt(area.color.slice(1,3),16);
+                g = parseInt(area.color.slice(3,5),16);
+                b = parseInt(area.color.slice(5,7),16);
+            }
+            const alpha = area.opacity !== undefined ? area.opacity : 0.92;
+            const type = area.type || 'brush';
+
+            if (type === 'polygon' || type === 'rect') {
+                // Filled polygon / rectangle
+                ctx.beginPath();
+                ctx.moveTo(area.points[0].x * z + ox, area.points[0].y * z + oy);
+                for (let i = 1; i < area.points.length; i++) ctx.lineTo(area.points[i].x * z + ox, area.points[i].y * z + oy);
+                ctx.closePath();
+                ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+                ctx.fill();
+                // Soft glow edge
+                ctx.strokeStyle = `rgba(${r},${g},${b},${Math.min(1, alpha + 0.1)})`;
+                ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+            } else {
+                // Brush stroke — use offscreen to prevent opacity accumulation
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+                ctx.lineWidth = (area.size || 40) * z;
+                ctx.beginPath();
+                ctx.moveTo(area.points[0].x * z + ox, area.points[0].y * z + oy);
+                for (let i = 1; i < area.points.length; i++) ctx.lineTo(area.points[i].x * z + ox, area.points[i].y * z + oy);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    });
+
+    // Draw polygon-in-progress preview
+    if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length > 0) {
+        ctx.save();
+        const pts = state.fogPolygonPoints;
+        ctx.strokeStyle = 'rgba(41,182,246,0.9)'; ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x * z + ox, pts[0].y * z + oy);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * z + ox, pts[i].y * z + oy);
+        if (state._polyMousePos) ctx.lineTo(state._polyMousePos.x * z + ox, state._polyMousePos.y * z + oy);
+        ctx.stroke();
+        // Draw vertex dots
+        ctx.setLineDash([]);
+        pts.forEach((p, i) => {
+            ctx.beginPath(); ctx.arc(p.x * z + ox, p.y * z + oy, i === 0 ? 6 : 4, 0, Math.PI * 2);
+            ctx.fillStyle = i === 0 ? '#ffd166' : '#29b6f6'; ctx.fill();
+        });
+        ctx.restore();
+    }
+
+    // Draw rect-in-progress preview
+    if (state.currentMode === 'fog' && state.currentFogMode === 'rect' && state.fogRectStart && state.fogRectPreview) {
+        ctx.save();
+        const s = state.fogRectStart, e = state.fogRectPreview;
+        let r2 = 0, g2 = 0, b2 = 0;
+        if (state.currentFogColor.startsWith('#') && state.currentFogColor.length === 7) {
+            r2 = parseInt(state.currentFogColor.slice(1,3),16);
+            g2 = parseInt(state.currentFogColor.slice(3,5),16);
+            b2 = parseInt(state.currentFogColor.slice(5,7),16);
+        }
+        ctx.fillStyle = `rgba(${r2},${g2},${b2},${state.currentFogOpacity * 0.5})`;
+        ctx.strokeStyle = `rgba(${r2},${g2},${b2},0.9)`;
+        ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+        const rx = s.x * z + ox, ry = s.y * z + oy;
+        const rw = (e.x - s.x) * z, rh = (e.y - s.y) * z;
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.restore();
+    }
+
+    ctx.restore();
+}
+
+function drawInitiativeHighlight(tokens, z, ox, oy) {
+    const combatants = state.initiative.combatants;
+    if (!combatants.length || state.initiative.currentIndex < 0) return;
+    const active = combatants[state.initiative.currentIndex];
+    if (!active) return;
+    const loc = getCurrentLocation(); if (!loc) return;
+    const token = loc.tokens.find(t => t.id === active.tokenRef);
+    if (!token) return;
+    const sx = token.x * z + ox, sy = token.y * z + oy, sr = token.radius * z;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(sx, sy, sr + 5, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(sx, sy, sr, sx, sy, sr + 8);
+    grad.addColorStop(0, 'rgba(129,194,132,0.9)');
+    grad.addColorStop(1, 'rgba(129,194,132,0)');
+    ctx.strokeStyle = '#81c784'; ctx.lineWidth = 3;
+    // Animated glow via offset rings
+    ctx.shadowColor = '#81c784'; ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.restore();
+}
+
+async function drawTokens(tokens, z, ox, oy) {
+    if (!tokens) return;
+    for (const t of tokens) {
+        const sx = t.x * z + ox, sy = t.y * z + oy, sr = t.radius * z;
+        try {
+            const img = await loadImage(t.src, `token_${t.id}`);
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(((t.rotation || 0) * Math.PI) / 180);
+            ctx.beginPath(); ctx.arc(0, 0, sr, 0, Math.PI * 2); ctx.clip();
+            ctx.drawImage(img, -sr, -sr, sr * 2, sr * 2);
+            ctx.restore();
+            ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+            ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
+        } catch {
+            ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+            ctx.fillStyle = 'purple'; ctx.fill();
+            ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
+        }
+        // Selection highlight ring
+        if (state.selectedTokenIds.has(t.id)) {
+            ctx.beginPath(); ctx.arc(sx, sy, sr + 4, 0, Math.PI * 2);
+            ctx.strokeStyle = '#29b6f6'; ctx.lineWidth = 2.5;
+            ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        // Status icons
+        if (t.statuses && t.statuses.length > 0) {
+            const iconSize = Math.max(10, Math.min(18, sr * 0.55));
+            ctx.font = `${iconSize}px serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            t.statuses.forEach((icon, idx) => {
+                const angle = (idx / t.statuses.length) * Math.PI * 2 - Math.PI / 2;
+                const ix = sx + Math.cos(angle) * (sr * 0.72);
+                const iy = sy + Math.sin(angle) * (sr * 0.72);
+                // Small dark background circle
+                ctx.save();
+                ctx.beginPath(); ctx.arc(ix, iy, iconSize * 0.6, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
+                ctx.restore();
+                ctx.fillText(icon, ix, iy);
+            });
+        }
+        ctx.font = `bold ${Math.max(10, Math.min(20, 12 * z))}px 'Segoe UI', sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "top";
+        ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 3;
+        let ty = sy + sr + 5;
+        if (t.name) {
+            ctx.strokeText(t.name, sx, ty); ctx.fillText(t.name, sx, ty);
+            ty += Math.max(10, Math.min(20, 12 * z)) + 2;
+        }
+        if (t.hp !== undefined && t.hp !== null && t.hp !== "") {
+            ctx.fillStyle = "#ff4a4a";
+            ctx.strokeText(`HP: ${t.hp}`, sx, ty); ctx.fillText(`HP: ${t.hp}`, sx, ty);
+        }
+        ctx.restore();
+    }
+}
+
+function drawRuler(z, ox, oy) {
+    if (!state.rulerStartPoint || !state.rulerEndPoint) return;
+    ctx.save();
+    ctx.strokeStyle = '#29b6f6'; ctx.lineWidth = 3; ctx.setLineDash([10, 5]); ctx.lineCap = 'round';
+    const sx = state.rulerStartPoint.x * z + ox, sy = state.rulerStartPoint.y * z + oy;
+    const ex = state.rulerEndPoint.x   * z + ox, ey = state.rulerEndPoint.y   * z + oy;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.setLineDash([]);
+    const dist = Math.hypot(state.rulerEndPoint.x - state.rulerStartPoint.x, state.rulerEndPoint.y - state.rulerStartPoint.y);
+    const feet = (dist / state.cellSize) * 5;
+    const text = `${feet % 1 === 0 ? feet : feet.toFixed(1)} фт.`;
+    ctx.font = `bold ${Math.max(12, 16 * z)}px 'Segoe UI', sans-serif`;
+    ctx.fillStyle = '#29b6f6'; ctx.strokeStyle = 'black'; ctx.lineWidth = 4;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    const mx = (sx + ex) / 2, my = (sy + ey) / 2;
+    ctx.strokeText(text, mx, my - 5); ctx.fillText(text, mx, my - 5);
+    ctx.restore();
+}
+
+function getCharLabel(i) {
+    let l = '';
+    while (i >= 0) { l = String.fromCharCode((i % 26) + 65) + l; i = Math.floor(i / 26) - 1; }
+    return l;
+}
+
+function drawDynamicRulers(mw, mh, z, ox, oy) {
+    const rs = state.rulerSize, sc = state.cellSize * z;
+    const cols = Math.ceil(mw / state.cellSize), rows = Math.ceil(mh / state.cellSize);
+    ctx.save();
+    // Horizontal ruler
+    ctx.fillStyle = "rgba(20,20,26,0.95)"; ctx.fillRect(rs, 0, canvas.width - rs, rs);
+    ctx.fillStyle = "#383842"; ctx.fillRect(rs, rs - 1, canvas.width - rs, 1);
+    ctx.font = "bold 11px 'Segoe UI', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.save(); ctx.beginPath(); ctx.rect(rs, 0, canvas.width - rs, rs); ctx.clip();
+    for (let i = 0; i < cols; i++) {
+        const cc = ox + i * sc + sc / 2;
+        if (cc > rs && cc < canvas.width) {
+            ctx.fillStyle = "#ffd166"; ctx.fillText(getCharLabel(i), cc, rs / 2);
+            ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(ox + i * sc, rs - 6, 1, 6);
+        }
+    }
+    ctx.restore();
+    // Vertical ruler
+    ctx.fillStyle = "rgba(20,20,26,0.95)"; ctx.fillRect(0, rs, rs, canvas.height - rs);
+    ctx.fillStyle = "#383842"; ctx.fillRect(rs - 1, rs, 1, canvas.height - rs);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, rs, rs, canvas.height - rs); ctx.clip();
+    for (let j = 0; j < rows; j++) {
+        const cc = oy + j * sc + sc / 2;
+        if (cc > rs && cc < canvas.height) {
+            ctx.fillStyle = "#ff4a4a"; ctx.fillText(j + 1, rs / 2, cc);
+            ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(rs - 6, oy + j * sc, 6, 1);
+        }
+    }
+    ctx.restore();
+    // Corner
+    ctx.fillStyle = "#14141a"; ctx.fillRect(0, 0, rs, rs);
+    ctx.fillStyle = "#383842"; ctx.fillRect(rs - 1, 0, 1, rs); ctx.fillRect(0, rs - 1, rs, 1);
+    ctx.restore();
+}
+
+// ============================================================
+//  MOUSE / EVENT HANDLERS
+// ============================================================
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    const mx = (cx - ox) / z, my = (cy - oy) / z;
+    const loc = getCurrentLocation();
+    if (!loc) return;
+
+    if (e.button === 1) {
+        state.isPanningMap = true; state.startX = e.clientX - ox; state.startY = e.clientY - oy;
+        canvas.style.cursor = 'grabbing'; return;
+    }
+    if (e.button === 0) {
+        // Shift+click anywhere = ping
+        if (e.shiftKey) {
+            createPing(mx, my);
+            return;
+        }
+        if (state.currentMode === 'draw') {
+            state.isDrawingNow = true;
+            state.currentLine = { color: state.currentBrushColor, size: state.currentBrushSize, points: [{ x: mx, y: my }] };
+            loc.drawings.push(state.currentLine); return;
+        }
+        if (state.currentMode === 'fog') {
+            if (!loc.fog) loc.fog = [];
+            if (state.currentFogMode === 'brush') {
+                state.isDrawingFog = true;
+                state.currentFogArea = { id: Date.now(), type: 'brush', hidden: false, color: state.currentFogColor, size: state.currentFogSize, opacity: state.currentFogOpacity, points: [{ x: mx, y: my }] };
+                loc.fog.push(state.currentFogArea);
+            } else if (state.currentFogMode === 'polygon') {
+                // Check if clicking near first point to close
+                if (state.fogPolygonPoints.length >= 3) {
+                    const fp = state.fogPolygonPoints[0];
+                    const dist = Math.hypot(mx - fp.x, my - fp.y);
+                    if (dist < 15 / z) { commitPolygonFog(loc); return; }
+                }
+                state.fogPolygonPoints.push({ x: mx, y: my });
+                drawCanvas();
+            } else if (state.currentFogMode === 'rect') {
+                state.isDrawingFog = true;
+                state.fogRectStart = { x: mx, y: my };
+                state.fogRectPreview = { x: mx, y: my };
+            }
+            return;
+        }
+        if (state.currentMode === 'select') {
+            // Check if clicking on an already-selected token to drag the group
+            const hitSelected = loc.tokens.find(t =>
+                state.selectedTokenIds.has(t.id) &&
+                Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z
+            );
+            if (hitSelected) {
+                state.isDraggingSelection = true;
+                state.selectionDragStart = { mx, my };
+                state.selectionTokenStartPos = loc.tokens
+                    .filter(t => state.selectedTokenIds.has(t.id))
+                    .map(t => ({ id: t.id, x: t.x, y: t.y }));
+                canvas.style.cursor = 'move';
+            } else {
+                // Start marquee selection rect — clear previous selection
+                state.selectedTokenIds = new Set();
+                state.isSelecting = true;
+                state.selectRect = { x1: mx, y1: my, x2: mx, y2: my };
+            }
+            return;
+        }
+        if (state.currentMode === 'eraser') {
+            const er = (state.currentBrushSize + 10) / z;
+            loc.drawings = loc.drawings.filter(line => !line.points.some(p => Math.hypot(p.x - mx, p.y - my) < er));
+            loc.fog = (loc.fog || []).filter(area => !area.points.some(p => Math.hypot(p.x - mx, p.y - my) < er));
+            pushHistory(); drawCanvas(); return;
+        }
+        if (state.currentMode === 'ruler') {
+            state.rulerStartPoint = { x: mx, y: my }; state.rulerEndPoint = { x: mx, y: my }; return;
+        }
+        if (state.currentMode === 'move') {
+            for (let i = loc.tokens.length - 1; i >= 0; i--) {
+                const t = loc.tokens[i];
+                if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
+                    state.isDraggingToken = true; state.draggedTokenIndex = i;
+                    canvas.style.cursor = 'move'; return;
+                }
+            }
+            state.isPanningMap = true; state.startX = e.clientX - ox; state.startY = e.clientY - oy;
+            canvas.style.cursor = 'grabbing';
+        }
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    const mx = (cx - ox) / z, my = (cy - oy) / z;
+
+    if (state.isPanningMap) { state.offsetX = e.clientX - state.startX; state.offsetY = e.clientY - state.startY; drawCanvas(); return; }
+    const loc = getCurrentLocation(); if (!loc) return;
+
+    if (state.currentMode === 'draw' && state.isDrawingNow && state.currentLine) { state.currentLine.points.push({ x: mx, y: my }); drawCanvas(); return; }
+    if (state.currentMode === 'select') {
+        if (state.isSelecting && state.selectRect) {
+            state.selectRect.x2 = mx; state.selectRect.y2 = my; drawCanvas(); return;
+        }
+        if (state.isDraggingSelection && state.selectionDragStart) {
+            const dx = mx - state.selectionDragStart.mx;
+            const dy = my - state.selectionDragStart.my;
+            state.selectionTokenStartPos.forEach(snap => {
+                const t = loc.tokens.find(t => t.id === snap.id);
+                if (t) { t.x = snap.x + dx; t.y = snap.y + dy; }
+            });
+            drawCanvas(); return;
+        }
+    }
+    if (state.currentMode === 'fog') {
+        if (state.currentFogMode === 'brush' && state.isDrawingFog && state.currentFogArea) {
+            state.currentFogArea.points.push({ x: mx, y: my }); drawCanvas(); return;
+        }
+        if (state.currentFogMode === 'polygon') {
+            state._polyMousePos = { x: mx, y: my }; drawCanvas(); return;
+        }
+        if (state.currentFogMode === 'rect' && state.isDrawingFog && state.fogRectStart) {
+            state.fogRectPreview = { x: mx, y: my }; drawCanvas(); return;
+        }
+    }
+    if (state.currentMode === 'ruler' && state.rulerStartPoint) { state.rulerEndPoint = { x: mx, y: my }; drawCanvas(); return; }
+    if (state.isDraggingToken && state.draggedTokenIndex !== null && loc.tokens[state.draggedTokenIndex]) {
+        loc.tokens[state.draggedTokenIndex].x = mx; loc.tokens[state.draggedTokenIndex].y = my; drawCanvas();
+    }
+});
+
+window.addEventListener('mouseup', (e) => {
+    if (state.isDrawingNow) { state.isDrawingNow = false; state.currentLine = null; pushHistory(); }
+    if (state.isSelecting && state.selectRect) {
+        // Finalize marquee — select all tokens inside rect
+        const r = state.selectRect;
+        const minX = Math.min(r.x1, r.x2), maxX = Math.max(r.x1, r.x2);
+        const minY = Math.min(r.y1, r.y2), maxY = Math.max(r.y1, r.y2);
+        const loc = getCurrentLocation();
+        if (loc) {
+            loc.tokens.forEach(t => {
+                if (t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY)
+                    state.selectedTokenIds.add(t.id);
+            });
+        }
+        state.isSelecting = false; state.selectRect = null; drawCanvas();
+    }
+    if (state.isDraggingSelection) {
+        state.isDraggingSelection = false; state.selectionDragStart = null;
+        state.selectionTokenStartPos = []; pushHistory();
+    }
+    if (state.isDrawingFog) {
+        if (state.currentFogMode === 'brush') {
+            state.isDrawingFog = false; state.currentFogArea = null; pushHistory();
+        } else if (state.currentFogMode === 'rect' && state.fogRectStart && state.fogRectPreview) {
+            const loc = getCurrentLocation();
+            if (loc) {
+                const s = state.fogRectStart, en = state.fogRectPreview;
+                const minX = Math.min(s.x, en.x), minY = Math.min(s.y, en.y);
+                const maxX = Math.max(s.x, en.x), maxY = Math.max(s.y, en.y);
+                if (Math.abs(maxX - minX) > 2 && Math.abs(maxY - minY) > 2) {
+                    if (!loc.fog) loc.fog = [];
+                    loc.fog.push({ id: Date.now(), type: 'rect', hidden: false, color: state.currentFogColor, opacity: state.currentFogOpacity, points: [
+                        { x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }
+                    ]});
+                    pushHistory();
+                }
+            }
+            state.isDrawingFog = false; state.fogRectStart = null; state.fogRectPreview = null; drawCanvas();
+        }
+    }
+    if (state.isDraggingToken) { state.isDraggingToken = false; state.draggedTokenIndex = null; pushHistory(); }
+    if (state.isPanningMap) { state.isPanningMap = false; syncCurrentLocationState(); }
+    canvas.style.cursor = 'default';
+});
+
+// Double-click: close polygon fog
+canvas.addEventListener('dblclick', (e) => {
+    if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length >= 3) {
+        e.preventDefault();
+        const loc = getCurrentLocation(); if (!loc) return;
+        commitPolygonFog(loc);
+    }
+});
+
+function commitPolygonFog(loc) {
+    if (!loc.fog) loc.fog = [];
+    loc.fog.push({ id: Date.now(), type: 'polygon', hidden: false, color: state.currentFogColor, opacity: state.currentFogOpacity, points: [...state.fogPolygonPoints] });
+    state.fogPolygonPoints = []; state._polyMousePos = null;
+    pushHistory(); drawCanvas();
+}
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+    const delta = e.deltaY * -0.001;
+    changeZoom(delta, mouseX, mouseY);
+    document.getElementById('zoom-text').innerText = `${Math.round(state.zoomLevel * 100)}%`;
+    drawCanvas();
+}, { passive: false });
+
+canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    const mx = (cx - ox) / z, my = (cy - oy) / z;
+    const loc = getCurrentLocation(); if (!loc) return;
+
+    hideAllContextMenus();
+    for (let i = loc.tokens.length - 1; i >= 0; i--) {
+        const t = loc.tokens[i];
+        if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
+            state.menuTargetTokenIndex = i;
+            const m = document.getElementById('token-menu');
+            m.style.display = 'block'; m.style.left = `${e.pageX}px`; m.style.top = `${e.pageY}px`;
+            return;
+        }
+    }
+    if (loc.fog) {
+        for (let i = loc.fog.length - 1; i >= 0; i--) {
+            const area = loc.fog[i];
+            if (isFogHit(area, mx, my)) {
+                state.menuTargetFogIndex = i;
+                const m = document.getElementById('fog-ctx-menu');
+                m.style.display = 'block'; m.style.left = `${e.pageX}px`; m.style.top = `${e.pageY}px`;
+                return;
+            }
+        }
+    }
+});
+
+function hideAllContextMenus() {
+    document.getElementById('token-menu').style.display = 'none';
+    document.getElementById('fog-ctx-menu').style.display = 'none';
+}
+
+// Universal fog hit detection — works for brush, polygon and rect
+function isFogHit(area, mx, my) {
+    const type = area.type || 'brush';
+    const pts = area.points;
+    if (!pts || pts.length === 0) return false;
+
+    if (type === 'brush') {
+        // Point is close to any stroke point (within half brush size)
+        const r = (area.size || 40) / 2;
+        return pts.some(p => Math.hypot(p.x - mx, p.y - my) < r);
+    }
+
+    if (type === 'polygon' || type === 'rect') {
+        // Point-in-polygon test (ray casting)
+        return pointInPolygon(mx, my, pts);
+    }
+
+    return false;
+}
+
+// Ray-casting algorithm: returns true if (px,py) is inside the polygon defined by pts
+function pointInPolygon(px, py, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i].x, yi = pts[i].y;
+        const xj = pts[j].x, yj = pts[j].y;
+        const intersect = ((yi > py) !== (yj > py)) &&
+            (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// Context menu actions
+document.getElementById('token-menu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const li = e.target.closest('li[data-action]');
+    if (li) {
+        const action = li.dataset.action, value = parseFloat(li.dataset.value);
+        if (action === 'resize-token') resizeSelectedToken(value);
+        if (action === 'rotate-token') rotateSelectedToken(value);
+        if (action === 'delete-token') deleteSelectedToken();
+        if (action === 'toggle-status') toggleTokenStatus(li.dataset.status);
+        if (action === 'clear-statuses') clearTokenStatuses();
+        hideAllContextMenus();
+    }
+});
+document.getElementById('token-menu-name').addEventListener('click', (e) => { e.stopPropagation(); editTokenName(); hideAllContextMenus(); });
+document.getElementById('token-menu-hp').addEventListener('click', (e) => { e.stopPropagation(); editTokenHP(); hideAllContextMenus(); });
+document.getElementById('token-menu-initiative').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const loc = getCurrentLocation();
+    if (loc && state.menuTargetTokenIndex !== null && loc.tokens[state.menuTargetTokenIndex]) {
+        const t = loc.tokens[state.menuTargetTokenIndex];
+        addTokenToInitiative(t);
+        // Switch to initiative tab
+        document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelector('[data-tab="initiative"]').classList.add('active');
+        document.getElementById('tab-initiative').classList.add('active');
+    }
+    hideAllContextMenus();
+});
+
+document.getElementById('fog-ctx-menu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const li = e.target.closest('li[data-action]');
+    if (li) {
+        if (li.dataset.action === 'toggle-fog-visibility') toggleFogAreaVisibility();
+        if (li.dataset.action === 'delete-fog') deleteSelectedFog();
+        hideAllContextMenus();
+    }
+});
+
+window.addEventListener('click', (e) => {
+    if (!e.target.closest('.ctx-menu-list')) hideAllContextMenus();
+    if (!e.target.closest('.dice-container')) {
+        document.getElementById('dice-popup').classList.remove('show');
+        document.getElementById('dice-toggle-btn').classList.remove('active');
+    }
+});
+
+// Drop zone
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', (e) => e.preventDefault());
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const internal = e.dataTransfer.getData('text/plain');
+    const rect = canvas.getBoundingClientRect();
+    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    const mx = (e.clientX - rect.left - ox) / z, my = (e.clientY - rect.top - oy) / z;
+    if (internal) {
+        addTokenToCurrentLocation({ id: Date.now(), src: internal, x: mx, y: my, radius: 25, name: "", hp: undefined, rotation: 0 });
+    } else {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const reader = new FileReader();
+            reader.onload = (ev) => setCurrentBackground(ev.target.result);
+            reader.readAsDataURL(files[0]);
+        }
+    }
+});
+
+// ============================================================
+//  TOOLBAR & CONTROLS
+// ============================================================
+// Zoom
+document.getElementById('zoom-in-btn').addEventListener('click', () => { changeZoom(0.1); updateZoomUI(); drawCanvas(); });
+document.getElementById('zoom-out-btn').addEventListener('click', () => { changeZoom(-0.1); updateZoomUI(); drawCanvas(); });
+document.getElementById('reset-zoom-btn').addEventListener('click', () => { resetZoomAndOffset(); updateZoomUI(); });
+document.getElementById('fullscreen-toggle-btn').addEventListener('click', () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    else document.exitFullscreen();
+});
+on('zoom:change', () => updateZoomUI());
+function updateZoomUI() { document.getElementById('zoom-text').innerText = `${Math.round(state.zoomLevel * 100)}%`; }
+
+// Grid
+document.getElementById('grid-toggle').addEventListener('click', () => { toggleGrid(); document.getElementById('grid-toggle').classList.toggle('active', state.isGridEnabled); });
+document.getElementById('grid-opacity').addEventListener('input', (e) => { setGridOpacity(parseFloat(e.target.value)); });
+document.getElementById('grid-color-toggle').addEventListener('click', () => { toggleGridColor(); });
+
+// Modes
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        setCurrentMode(mode);
+        // Show popup only when clicking the button; hide on mouseleave (see below)
+        document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
+        document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
+        if (mode !== 'ruler') { state.rulerStartPoint = null; state.rulerEndPoint = null; drawCanvas(); }
+    });
+});
+
+// Popup hides when mouse leaves the mode-container (button + popup area)
+// Delay prevents accidental collapse when moving mouse from button to popup
+const _popupHideTimers = new WeakMap();
+document.querySelectorAll('.mode-container').forEach(container => {
+    container.addEventListener('mouseleave', () => {
+        const timer = setTimeout(() => {
+            container.querySelector('.drawing-popup')?.classList.remove('show');
+        }, 350);
+        _popupHideTimers.set(container, timer);
+    });
+    container.addEventListener('mouseenter', () => {
+        // Cancel pending hide
+        const timer = _popupHideTimers.get(container);
+        if (timer) { clearTimeout(timer); _popupHideTimers.delete(container); }
+        // Re-show popup on hover if this mode is active
+        const btn = container.querySelector('.mode-btn');
+        if (!btn) return;
+        const mode = btn.dataset.mode;
+        if (state.currentMode === mode && (mode === 'draw' || mode === 'fog')) {
+            container.querySelector('.drawing-popup')?.classList.add('show');
+        }
+    });
+});
+
+// Undo/Redo
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-redo').addEventListener('click', redo);
+
+// ESC: exit ruler mode
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        // Cancel polygon fog
+        if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length > 0) {
+            state.fogPolygonPoints = []; state._polyMousePos = null; drawCanvas(); return;
+        }
+        // Deselect tokens
+        if (state.selectedTokenIds.size > 0) {
+            state.selectedTokenIds = new Set(); drawCanvas(); return;
+        }
+        // Exit ruler mode
+        if (state.currentMode === 'ruler') {
+            state.rulerStartPoint = null; state.rulerEndPoint = null;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-mode-move').classList.add('active');
+            setCurrentMode('move'); drawCanvas();
+        }
+    }
+});
+
+// Save/Load
+document.getElementById('save-adventure-btn').addEventListener('click', () => {
+    syncCurrentLocationState();
+    const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.adventureData));
+    const a = document.createElement('a'); a.href = str; a.download = "adventure.json"; a.click();
+});
+document.getElementById('load-adventure-btn').addEventListener('click', () => {
+    document.getElementById('load-adventure-file').click();
+});
+document.getElementById('load-adventure-file').addEventListener('click', function() { this.value = null; });
+document.getElementById('load-adventure-file').addEventListener('change', (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        try {
+            state.adventureData = JSON.parse(ev.target.result);
+            state.imageCache.clear();
+            // Ensure tokens have all fields
+            state.adventureData.locations.forEach(loc => {
+                loc.tokens.forEach(t => {
+                    if (t.name === undefined) t.name = "";
+                    if (t.rotation === undefined) t.rotation = 0;
+                });
+                if (!loc.fog) loc.fog = [];
+            });
+            const loc = getCurrentLocation() || state.adventureData.locations[0];
+            if (loc) {
+                state.adventureData.currentLocationId = loc.id;
+                state.zoomLevel = loc.zoomLevel !== undefined ? loc.zoomLevel : 1.0;
+                state.offsetX   = loc.offsetX   !== undefined ? loc.offsetX   : 50;
+                state.offsetY   = loc.offsetY   !== undefined ? loc.offsetY   : 50;
+            }
+            updateZoomUI();
+            renderLocations(); renderLibrary(); drawCanvas();
+            state.drawingHistory = []; state.drawingHistoryIndex = -1;
+            pushHistory(); updateUndoRedoButtons();
+        } catch { alert("Ошибка загрузки файла!"); }
+    };
+    reader.readAsText(file);
+});
+
+// Brush / Fog size sliders
+const brushSizeSlider = document.getElementById('brush-size-slider');
+brushSizeSlider.addEventListener('input', (e) => { state.currentBrushSize = parseInt(e.target.value); renderBrushPreview(); });
+
+const fogSizeSlider = document.getElementById('fog-size-slider');
+fogSizeSlider.addEventListener('input', (e) => { state.currentFogSize = parseInt(e.target.value); renderFogPreview(); });
+
+const fogOpacitySlider = document.getElementById('fog-opacity-slider');
+fogOpacitySlider.addEventListener('input', (e) => {
+    const v = parseInt(e.target.value);
+    state.currentFogOpacity = v / 100;
+    document.getElementById('fog-opacity-text').innerText = `Плотность: ${v}%`;
+    renderFogPreview();
+});
+
+// Fog mode switcher
+document.querySelectorAll('.fog-mode-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.fog-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.currentFogMode = btn.dataset.fogmode;
+        // Cancel any in-progress polygon
+        state.fogPolygonPoints = []; state._polyMousePos = null;
+        // Show/hide brush options
+        const brushOpts = document.getElementById('fog-brush-options');
+        const hint = document.getElementById('fog-polygon-hint');
+        brushOpts.style.display = state.currentFogMode === 'brush' ? 'block' : 'none';
+        hint.style.display = state.currentFogMode === 'polygon' ? 'block' : 'none';
+        drawCanvas();
+    });
+});
+
+// ============================================================
+//  COLOR GRIDS & PREVIEWS
+// ============================================================
+function initColorGrids() {
+    const brushGrid = document.getElementById('brush-colors');
+    brushGrid.innerHTML = '';
+    state.snippingColors.forEach(color => {
+        const c = document.createElement('div');
+        c.className = 'color-circle' + (color === state.currentBrushColor ? ' selected' : '');
+        c.style.backgroundColor = color;
+        c.addEventListener('click', (e) => {
+            e.stopPropagation();
+            brushGrid.querySelectorAll('.color-circle').forEach(cc => cc.classList.remove('selected'));
+            c.classList.add('selected');
+            state.currentBrushColor = color;
+            renderBrushPreview();
+        });
+        brushGrid.appendChild(c);
+    });
+
+    const fogGrid = document.getElementById('fog-colors');
+    fogGrid.innerHTML = '';
+    state.snippingColors.forEach(color => {
+        const c = document.createElement('div');
+        c.className = 'color-circle' + (color === state.currentFogColor ? ' selected' : '');
+        c.style.backgroundColor = color;
+        c.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fogGrid.querySelectorAll('.color-circle').forEach(cc => cc.classList.remove('selected'));
+            c.classList.add('selected');
+            state.currentFogColor = color;
+            renderFogPreview();
+        });
+        fogGrid.appendChild(c);
+    });
+
+    renderBrushPreview(); renderFogPreview();
+}
+
+function renderBrushPreview() {
+    const pc = document.getElementById('brush-preview'), px = pc.getContext('2d');
+    px.clearRect(0, 0, pc.width, pc.height);
+    px.beginPath(); px.moveTo(20, pc.height / 2); px.bezierCurveTo(60, 5, 180, 55, 220, pc.height / 2);
+    px.strokeStyle = state.currentBrushColor; px.lineWidth = Math.min(state.currentBrushSize, 20); px.lineCap = 'round'; px.stroke();
+}
+
+function renderFogPreview() {
+    const pc = document.getElementById('fog-preview'), px = pc.getContext('2d');
+    px.clearRect(0, 0, pc.width, pc.height);
+    px.beginPath(); px.moveTo(20, pc.height / 2); px.bezierCurveTo(60, 5, 180, 55, 220, pc.height / 2);
+    px.strokeStyle = state.currentFogColor; px.globalAlpha = state.currentFogOpacity;
+    px.lineWidth = Math.max(4, Math.min(state.currentFogSize / 4, 25)); px.lineCap = 'round'; px.stroke();
+    px.globalAlpha = 1.0;
+}
+
+// ============================================================
+//  SIDEBAR — LOCATIONS & LIBRARY
+// ============================================================
+on('locations:update', renderLocations);
+on('library:update', renderLibrary);
+on('canvas:redraw', drawCanvas);
+
+function renderLocations() {
+    const list = document.getElementById('location-list'); list.innerHTML = '';
+    state.adventureData.locations.forEach(loc => {
+        const li = document.createElement('li');
+        li.className = `tree-item ${loc.id === state.adventureData.currentLocationId ? 'folder-header' : ''}`;
+        if (loc.id === state.adventureData.currentLocationId) li.style.color = 'var(--accent-color)';
+        li.innerHTML = `<span class="location-name">📍 ${loc.name}</span>
+            ${state.adventureData.locations.length > 1 ? `<button class="delete-item">×</button>` : ''}`;
+        li.querySelector('.location-name').addEventListener('click', () => setCurrentLocationId(loc.id));
+        const del = li.querySelector('.delete-item');
+        if (del) del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm(`Удалить локацию "${loc.name}"?`)) deleteLocation(loc.id);
+        });
+        list.appendChild(li);
+    });
+}
+
+function renderLibrary() {
+    const tree = document.getElementById('file-tree'); tree.innerHTML = '';
+    state.adventureData.library.forEach(folder => {
+        const folderDiv = document.createElement('div'); folderDiv.className = 'folder-container';
+        const header = document.createElement('div'); header.className = 'tree-item folder-header';
+        const arrow = folder.collapsed ? '▶' : '▼';
+        header.innerHTML = `<span class="folder-toggle">${arrow} 📁 ${folder.name}</span>
+            <button class="delete-item">×</button>`;
+        header.querySelector('.folder-toggle').addEventListener('click', () => toggleLibraryFolder(folder.id));
+        header.querySelector('.delete-item').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const msg = folder.children.length > 0
+                ? `Удалить папку "${folder.name}" и все файлы (${folder.children.length} шт.)?`
+                : `Удалить пустую папку "${folder.name}"?`;
+            if (confirm(msg)) deleteLibraryFolder(folder.id);
+        });
+        header.addEventListener('dragenter', (e) => { e.preventDefault(); header.classList.add('drag-over'); });
+        header.addEventListener('dragover', (e) => e.preventDefault());
+        header.addEventListener('dragleave', () => header.classList.remove('drag-over'));
+        header.addEventListener('drop', (e) => {
+            e.preventDefault(); header.classList.remove('drag-over');
+            for (const file of e.dataTransfer.files) {
+                const r = new FileReader();
+                r.onload = (ev) => addFileToFolder(folder.id, { name: file.name, data: ev.target.result });
+                r.readAsDataURL(file);
             }
         });
+        const ul = document.createElement('ul');
+        ul.className = 'folder-children' + (folder.collapsed ? ' collapsed' : '');
+        folder.children.forEach(file => {
+            const li = document.createElement('li');
+            li.className = 'tree-item file-item'; li.setAttribute('draggable', 'true');
+            li.innerHTML = `<span>🖼️ ${file.name}</span><button class="delete-item">×</button>`;
+            li.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', file.data));
+            li.querySelector('.delete-item').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm(`Удалить файл "${file.name}"?`)) deleteFileFromFolder(folder.id, file.id);
+            });
+            ul.appendChild(li);
+        });
+        folderDiv.appendChild(header); folderDiv.appendChild(ul); tree.appendChild(folderDiv);
+    });
+}
 
-        function saveAdventure() { 
-            // Перед записью JSON синхронизируем координаты активного экрана с данными текущей локации
-            const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId);
-            if (currentLoc) {
-                currentLoc.zoomLevel = zoomLevel;
-                currentLoc.offsetX = offsetX;
-                currentLoc.offsetY = offsetY;
-            }
+// Tab switching
+document.querySelectorAll('.tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    });
+});
 
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(adventureData)); 
-            const dl = document.createElement('a'); 
-            dl.setAttribute("href", dataStr); 
-            dl.setAttribute("download", "my_adventure.json"); 
-            dl.click(); 
+// Sidebar action buttons
+document.getElementById('add-location-btn').addEventListener('click', () => {
+    let max = 0;
+    state.adventureData.locations.forEach(loc => {
+        const m = loc.name.match(/\d+/g);
+        if (m) { const v = parseInt(m[m.length - 1]); if (v > max) max = v; }
+    });
+    const name = prompt("Название локации:", `Локация ${max + 1}`);
+    if (name) addLocation(name);
+});
+document.getElementById('create-folder-btn').addEventListener('click', () => {
+    const name = prompt("Название папки:"); if (name) addLibraryFolder(name);
+});
+
+// ============================================================
+//  STATUS EFFECTS
+// ============================================================
+function toggleTokenStatus(icon) {
+    const loc = getCurrentLocation();
+    if (!loc || state.menuTargetTokenIndex === null) return;
+    const t = loc.tokens[state.menuTargetTokenIndex];
+    if (!t.statuses) t.statuses = [];
+    const idx = t.statuses.indexOf(icon);
+    if (idx >= 0) t.statuses.splice(idx, 1);
+    else t.statuses.push(icon);
+    // Sync to initiative list if present
+    renderInitiative();
+    pushHistory(); emit('canvas:redraw');
+}
+function clearTokenStatuses() {
+    const loc = getCurrentLocation();
+    if (!loc || state.menuTargetTokenIndex === null) return;
+    loc.tokens[state.menuTargetTokenIndex].statuses = [];
+    renderInitiative();
+    pushHistory(); emit('canvas:redraw');
+}
+
+// ============================================================
+//  INITIATIVE TRACKER
+// ============================================================
+function addTokenToInitiative(token) {
+    const existing = state.initiative.combatants.find(c => c.tokenRef === token.id);
+    if (existing) { renderInitiative(); return; }
+    state.initiative.combatants.push({
+        id: Date.now(),
+        name: token.name || 'Безымянный',
+        init: 10,
+        hp: token.hp !== undefined ? token.hp : '',
+        tokenRef: token.id,
+    });
+    renderInitiative();
+}
+
+function renderInitiative() {
+    const list = document.getElementById('init-list'); if (!list) return;
+    list.innerHTML = '';
+    const combatants = state.initiative.combatants;
+
+    combatants.forEach((c, idx) => {
+        const isActive = idx === state.initiative.currentIndex;
+        const loc = getCurrentLocation();
+        const token = loc ? loc.tokens.find(t => t.id === c.tokenRef) : null;
+        const statusStr = (token && token.statuses && token.statuses.length) ? token.statuses.join('') : '';
+
+        // Sync HP from tracker back to token if token exists
+        const syncHP = (val) => {
+            c.hp = val;
+            if (token) { token.hp = val === '' ? undefined : val; emit('canvas:redraw'); }
+        };
+
+        const li = document.createElement('li');
+        li.className = 'init-item' + (isActive ? ' active-turn' : '');
+
+        // Build HP block
+        const hpVal = c.hp !== undefined && c.hp !== '' ? c.hp : '—';
+
+        li.innerHTML = `
+            <div class="init-row-top">
+                <input class="init-val" type="number" value="${c.init}" min="-20" max="30" title="Инициатива">
+                <span class="init-name" title="${c.name}">${statusStr ? '<span class="init-statuses">' + statusStr + '</span> ' : ''}${c.name}</span>
+                <button class="init-del" title="Убрать из боя">×</button>
+            </div>
+            <div class="init-hp-row">
+                <button class="init-hp-btn minus" title="-1 HP">−</button>
+                <button class="init-hp-btn minus5" title="-5 HP">−5</button>
+                <input class="init-hp-input" type="text" value="${hpVal === '—' ? '' : hpVal}" placeholder="HP">
+                <button class="init-hp-btn plus5" title="+5 HP">+5</button>
+                <button class="init-hp-btn plus" title="+1 HP">+</button>
+            </div>
+        `;
+
+        // Init value change
+        li.querySelector('.init-val').addEventListener('change', (e) => {
+            c.init = parseInt(e.target.value) || 0;
+        });
+
+        // HP input direct edit
+        const hpInput = li.querySelector('.init-hp-input');
+        hpInput.addEventListener('change', () => {
+            const v = hpInput.value.trim();
+            syncHP(v === '' ? '' : parseInt(v) || 0);
+            renderInitiative();
+        });
+        hpInput.addEventListener('click', (e) => e.stopPropagation());
+
+        // +/- buttons
+        const delta = (d) => {
+            const cur = c.hp !== '' && c.hp !== undefined ? parseInt(c.hp) || 0 : 0;
+            const next = Math.max(0, cur + d);
+            syncHP(next);
+            renderInitiative();
+        };
+        li.querySelector('.minus').addEventListener('click', () => delta(-1));
+        li.querySelector('.minus5').addEventListener('click', () => delta(-5));
+        li.querySelector('.plus').addEventListener('click', () => delta(+1));
+        li.querySelector('.plus5').addEventListener('click', () => delta(+5));
+
+        // Delete
+        li.querySelector('.init-del').addEventListener('click', () => {
+            state.initiative.combatants.splice(idx, 1);
+            if (state.initiative.currentIndex >= state.initiative.combatants.length)
+                state.initiative.currentIndex = state.initiative.combatants.length - 1;
+            renderInitiative(); emit('canvas:redraw');
+        });
+
+        list.appendChild(li);
+    });
+    document.getElementById('init-round-num').textContent = state.initiative.round;
+}
+
+on('initiative:update', renderInitiative);
+
+// Initiative buttons
+document.getElementById('init-import-btn').addEventListener('click', () => {
+    const loc = getCurrentLocation(); if (!loc) return;
+    loc.tokens.forEach(t => addTokenToInitiative(t));
+});
+document.getElementById('init-add-btn').addEventListener('click', () => {
+    state.initiative.combatants.push({ id: Date.now(), name: 'Существо', init: 10, hp: '', tokenRef: null });
+    renderInitiative();
+});
+document.getElementById('init-sort-btn').addEventListener('click', () => {
+    // Read current input values before sorting
+    document.querySelectorAll('#init-list .init-val').forEach((inp, idx) => {
+        state.initiative.combatants[idx].init = parseInt(inp.value) || 0;
+    });
+    state.initiative.combatants.sort((a, b) => b.init - a.init);
+    state.initiative.currentIndex = state.initiative.combatants.length > 0 ? 0 : -1;
+    renderInitiative(); emit('canvas:redraw');
+});
+document.getElementById('init-clear-btn').addEventListener('click', () => {
+    state.initiative.combatants = []; state.initiative.currentIndex = -1; state.initiative.round = 1;
+    renderInitiative(); emit('canvas:redraw');
+});
+document.getElementById('init-next-btn').addEventListener('click', () => {
+    if (!state.initiative.combatants.length) return;
+    state.initiative.currentIndex++;
+    if (state.initiative.currentIndex >= state.initiative.combatants.length) {
+        state.initiative.currentIndex = 0;
+        state.initiative.round++;
+    }
+    renderInitiative(); emit('canvas:redraw');
+});
+
+// ============================================================
+//  PING SYSTEM
+// ============================================================
+const PING_DURATION = 2200; // ms
+const PING_COLORS = ['#ffd166', '#ff4a4a', '#29b6f6', '#81c784', '#ce93d8'];
+let _pingColorIdx = 0;
+
+function createPing(mx, my) {
+    state.pings.push({
+        x: mx, y: my,
+        startTime: performance.now(),
+        color: PING_COLORS[_pingColorIdx % PING_COLORS.length],
+    });
+    _pingColorIdx++;
+    if (!state._pingAnimFrame) startPingAnimation();
+}
+
+function startPingAnimation() {
+    const animate = (now) => {
+        // Remove expired pings
+        state.pings = state.pings.filter(p => now - p.startTime < PING_DURATION);
+        drawCanvas();
+        if (state.pings.length > 0) {
+            state._pingAnimFrame = requestAnimationFrame(animate);
+        } else {
+            state._pingAnimFrame = null;
         }
-        
-        function loadAdventure(event) { 
-            const file = event.target.files[0]; 
-            if (!file) return; 
-            const reader = new FileReader(); 
-            reader.onload = function(e) { 
-                try { 
-                    adventureData = JSON.parse(e.target.result); 
-                    imageCache.clear(); 
-                    
-                    // При загрузке JSON вытаскиваем координаты для текущей активной локации сессии
-                    const currentLoc = adventureData.locations.find(l => l.id === adventureData.currentLocationId) || adventureData.locations[0];
-                    if (currentLoc) {
-                        adventureData.currentLocationId = currentLoc.id;
-                        zoomLevel = currentLoc.zoomLevel !== undefined ? currentLoc.zoomLevel : 1.0;
-                        offsetX = currentLoc.offsetX !== undefined ? currentLoc.offsetX : 50;
-                        offsetY = currentLoc.offsetY !== undefined ? currentLoc.offsetY : 50;
-                    }
-                    
-                    document.getElementById('zoom-text').innerText = `${Math.round(zoomLevel * 100)}%`;
-                    
-                    renderLocations(); 
-                    renderLibrary(); 
-                    drawCanvas(); 
-                } catch { 
-                    alert("Ошибка файла!"); 
-                } 
-            }; 
-            reader.readAsText(file); 
-        }
+    };
+    state._pingAnimFrame = requestAnimationFrame(animate);
+}
 
-        initMenus(); renderLocations(); renderLibrary(); resizeCanvas();
-    </script>
+function drawPings(z, ox, oy) {
+    if (!state.pings.length) return;
+    const now = performance.now();
+    ctx.save();
+    state.pings.forEach(p => {
+        const elapsed = now - p.startTime;
+        const progress = elapsed / PING_DURATION; // 0..1
+        const sx = p.x * z + ox, sy = p.y * z + oy;
+
+        // Parse color for rgba
+        const hex = p.color.replace('#','');
+        const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+
+        // Three expanding rings with stagger
+        [0, 0.18, 0.36].forEach(offset => {
+            const rp = (progress + offset) % 1.0;
+            const radius = rp * 55 * Math.min(z, 1.5);
+            const alpha = (1 - rp) * (1 - progress * 0.5);
+            if (alpha <= 0) return;
+            ctx.beginPath();
+            ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+            ctx.lineWidth = 2.5 * (1 - rp);
+            ctx.stroke();
+        });
+
+        // Center dot (fades out in second half)
+        const dotAlpha = Math.max(0, 1 - progress * 2);
+        if (dotAlpha > 0) {
+            ctx.beginPath();
+            ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${r},${g},${b},${dotAlpha})`;
+            ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    });
+    ctx.restore();
+}
+// ============================================================
+//  SELECTION — COPY / PASTE / DELETE
+// ============================================================
+function copySelectedTokens() {
+    const loc = getCurrentLocation(); if (!loc) return;
+    const selected = loc.tokens.filter(t => state.selectedTokenIds.has(t.id));
+    if (!selected.length) return;
+    state.clipboard = selected.map(t => JSON.parse(JSON.stringify(t)));
+    // Visual feedback on button
+    const btn = document.getElementById('btn-copy-tokens');
+    btn.style.color = '#81c784';
+    setTimeout(() => { btn.style.color = ''; }, 800);
+}
+
+function pasteTokens() {
+    if (!state.clipboard.length) return;
+    const loc = getCurrentLocation(); if (!loc) return;
+    state.selectedTokenIds = new Set();
+    const OFFSET = 30; // pixels so pasted tokens don't land exactly on originals
+    state.clipboard.forEach(t => {
+        const newToken = JSON.parse(JSON.stringify(t));
+        newToken.id = Date.now() + Math.random();
+        newToken.x += OFFSET; newToken.y += OFFSET;
+        loc.tokens.push(newToken);
+        state.selectedTokenIds.add(newToken.id);
+    });
+    pushHistory(); emit('canvas:redraw');
+}
+
+function deleteSelectedTokens() {
+    const loc = getCurrentLocation(); if (!loc) return;
+    if (!state.selectedTokenIds.size) return;
+    loc.tokens = loc.tokens.filter(t => !state.selectedTokenIds.has(t.id));
+    state.selectedTokenIds = new Set();
+    pushHistory(); emit('canvas:redraw');
+}
+
+document.getElementById('btn-copy-tokens').addEventListener('click', copySelectedTokens);
+document.getElementById('btn-paste-tokens').addEventListener('click', pasteTokens);
+
+// Extend keydown with Ctrl+C, Ctrl+V, Del for selection
+// Ctrl+C, Ctrl+V, Del keyboard shortcuts for selection
+document.addEventListener('keydown', (e) => {
+    // Del — delete selected tokens
+    if (e.key === 'Delete' && state.selectedTokenIds.size > 0) {
+        deleteSelectedTokens(); return;
+    }
+    // Ctrl+C — copy
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c' && state.currentMode === 'select') {
+        e.preventDefault(); copySelectedTokens(); return;
+    }
+    // Ctrl+V — paste
+    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault(); pasteTokens(); return;
+    }
+});
+
+// ============================================================
+//  SELECTION OVERLAY
+// ============================================================
+function drawSelectionOverlay(z, ox, oy) {
+    if (!state.isSelecting || !state.selectRect) return;
+    const r = state.selectRect;
+    const x = Math.min(r.x1, r.x2) * z + ox;
+    const y = Math.min(r.y1, r.y2) * z + oy;
+    const w = Math.abs(r.x2 - r.x1) * z;
+    const h = Math.abs(r.y2 - r.y1) * z;
+    ctx.save();
+    ctx.fillStyle = 'rgba(41,182,246,0.08)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(41,182,246,0.85)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    ctx.restore();
+}
+
+// ============================================================
+function initDiceRoller() {
+    const container = document.getElementById('dice-buttons');
+    const result    = document.getElementById('dice-result');
+    const history   = document.getElementById('dice-history');
+    const toggleBtn = document.getElementById('dice-toggle-btn');
+    const popup     = document.getElementById('dice-popup');
+
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = popup.classList.contains('show');
+        popup.classList.toggle('show', !isOpen);
+        toggleBtn.classList.toggle('active', !isOpen);
+    });
+
+    [4, 6, 8, 10, 12, 20, 100].forEach(die => {
+        const btn = document.createElement('button');
+        btn.className = 'system-btn'; btn.innerText = `d${die}`;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const r = Math.floor(Math.random() * die) + 1;
+            result.innerText = `\uD83C\uDFB2 ${r}`;
+            toggleBtn.innerText = `\uD83C\uDFB2 d${die}: ${r}`;
+            const li = document.createElement('li');
+            li.innerText = `d${die} \u2192 ${r}`;
+            history.prepend(li);
+            while (history.children.length > 8) history.removeChild(history.lastChild);
+        });
+        container.appendChild(btn);
+    });
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+initColorGrids();
+initDiceRoller();
+renderLocations();
+renderLibrary();
+renderInitiative();
+resizeCanvas();
+pushHistory();
+updateUndoRedoButtons();
+</script>
 </body>
 </html>
