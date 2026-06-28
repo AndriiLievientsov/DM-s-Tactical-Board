@@ -1,4 +1,4 @@
-![Uploading Opera Снимок_2026-06-28_172021_dms_tactical_board_v3.html.png…]()
+![Uploading pw.png…]()
 
 # 🎲 DM's Tactical Board V3
 
