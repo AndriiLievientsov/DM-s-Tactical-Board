@@ -1,4 +1,4 @@
-<img width="2540" height="1302" alt="pr" src="https://github.com/user-attachments/assets/b22398fb-a62a-4a58-952c-48be450adf97" />
+![Uploading Opera Снимок_2026-06-28_172021_dms_tactical_board_v3.html.png…]()
 
 # 🎲 DM's Tactical Board V3
 
