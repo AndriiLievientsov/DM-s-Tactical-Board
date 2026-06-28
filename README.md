@@ -1,4 +1,4 @@
-![Uploading pw.png…]()
+![Превью](pw.png)
 
 # 🎲 DM's Tactical Board V3
 
