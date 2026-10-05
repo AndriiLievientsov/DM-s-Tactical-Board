@@ -178,6 +178,8 @@
             <button class="system-btn" id="save-adventure-btn">💾 Сохранить</button>
             <button class="system-btn" id="load-adventure-btn">📂 Загрузить</button>
             <input type="file" id="load-adventure-file" style="display:none" accept=".json">
+            <button class="system-btn" id="load-map-btn" title="Загрузить картинку карты для текущей локации">🖼️ Карта</button>
+            <input type="file" id="load-map-file" style="display:none" accept="image/*">
             <span id="save-status" role="status" aria-live="polite"></span>
 
             <div class="controls-group">
@@ -1349,7 +1351,7 @@ function drawDynamicRulers(mw, mh, z, ox, oy) {
 // ============================================================
 // Pointer events: one code path for mouse, pen and touch. Two fingers = pinch-zoom + pan.
 const _pointers = new Map();
-let _pinch = null;
+let _pinch = null, _lpTimer = null, _lpStart = null;
 function cancelActiveGestures() {
     state.isDraggingToken = false; state.draggedTokenIndex = null; state.isPanningMap = false;
     state.isDrawingNow = false; state.currentLine = null; state.isSelecting = false; state.selectRect = null;
@@ -1381,6 +1383,17 @@ canvas.addEventListener('pointerdown', (e) => {
     _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (_pointers.size === 2) { startPinch(); return; }
     if (_pointers.size > 2) return;
+    if (e.pointerType === 'touch') {   // long-press = ping (Shift+click equivalent)
+        clearTimeout(_lpTimer);
+        _lpStart = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        _lpTimer = setTimeout(() => {
+            if (!_pointers.has(_lpStart.id) || _pointers.size !== 1) return;
+            const r = canvas.getBoundingClientRect();
+            cancelActiveGestures();
+            createPing((_lpStart.x - r.left - state.offsetX) / state.zoomLevel, (_lpStart.y - r.top - state.offsetY) / state.zoomLevel);
+            _lpStart = null;
+        }, 600);
+    }
     try { canvas.setPointerCapture(e.pointerId); } catch { /* not capturable — window listeners still cover it */ }
     const rect = canvas.getBoundingClientRect();
     const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
@@ -1477,6 +1490,7 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
     if (isPlayer) return;
     if (_pointers.has(e.pointerId)) _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (_lpStart && Math.hypot(e.clientX - _lpStart.x, e.clientY - _lpStart.y) > 10) { clearTimeout(_lpTimer); _lpStart = null; }
     if (_pinch && _pointers.size >= 2) { updatePinch(); return; }
     if (_pointers.size > 1) return;
     const rect = canvas.getBoundingClientRect();
@@ -1531,6 +1545,7 @@ canvas.addEventListener('pointermove', (e) => {
 function onPointerRelease(e) {
     if (isPlayer) return;
     _pointers.delete(e.pointerId);
+    clearTimeout(_lpTimer); _lpStart = null;
     if (_pointers.size < 2) _pinch = null;
     state.tplDragging = false;
     if (state.isDrawingNow) { state.isDrawingNow = false; state.currentLine = null; pushHistory(); }
@@ -1968,9 +1983,21 @@ function renderLibrary() {
         const header = document.createElement('div'); header.className = 'tree-item folder-header';
         const arrow = folder.collapsed ? '▶' : '▼';
         header.innerHTML = `<span class="folder-toggle">${arrow} 📁 ${esc(folder.name)}</span>
-            <button class="delete-item">×</button>`;
+            <span><button class="delete-item add-file-btn" title="Добавить изображения токенов" aria-label="Добавить файлы" style="color:#81c784">＋</button><button class="delete-item" aria-label="Удалить папку">×</button></span>`;
         header.querySelector('.folder-toggle').addEventListener('click', () => toggleLibraryFolder(folder.id));
-        header.querySelector('.delete-item').addEventListener('click', (e) => {
+        header.querySelector('.add-file-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+            input.addEventListener('change', () => {
+                for (const file of input.files) {
+                    const fname = file.name, foldId = folder.id;
+                    compressTokenFile(file, (data) => addFileToFolder(foldId, { name: fname, data }));
+                }
+            });
+            input.click();
+        });
+        header.querySelector('.delete-item:not(.add-file-btn)').addEventListener('click', (e) => {
             e.stopPropagation();
             const msg = folder.children.length > 0
                 ? `Удалить папку "${folder.name}" и все файлы (${folder.children.length} шт.)?`
@@ -2613,6 +2640,13 @@ function refreshPropsPanel() {
         b.classList.toggle('active', t.statuses && t.statuses.includes(b.dataset.icon));
     });
 }
+
+// Map upload by button (drag & drop isn't available on tablets)
+document.getElementById('load-map-btn').addEventListener('click', () => document.getElementById('load-map-file').click());
+document.getElementById('load-map-file').addEventListener('change', (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (file) compressImageFile(file, 1600, (data) => setCurrentBackground(data));
+});
 
 // ============================================================
 //  AoE TEMPLATES UI
