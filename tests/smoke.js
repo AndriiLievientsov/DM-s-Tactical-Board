@@ -16,6 +16,16 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(URL);
 
+  // First launch shows the help guide; closing it remembers that
+  assert.ok(await page.isVisible('#help-overlay'), 'help not shown on first launch');
+  assert.ok((await page.textContent('#help-keys')).includes('Стены и двери'));
+  await page.click('#help-close');
+  assert.ok(!(await page.isVisible('#help-overlay')), 'help did not close');
+  await page.keyboard.press('?');
+  assert.ok(await page.isVisible('#help-overlay'), '? does not open help');
+  await page.keyboard.press('Escape');
+  assert.ok(!(await page.isVisible('#help-overlay')), 'Esc does not close help');
+
   // XSS: location names must be escaped
   await page.evaluate((png) => {
     const loc = getCurrentLocation();
