@@ -264,6 +264,14 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   await page.evaluate(() => { openPropsForToken(9); const c = document.getElementById('prop-hidden'); c.checked = false; c.dispatchEvent(new Event('change')); });
   await p2.waitForTimeout(400);
   assert.deepStrictEqual(await p2.evaluate(() => getCurrentLocation().tokens.length), 1, 'unhidden token missing for players');
+  // Dice rolls reach the player window only when sharing is on
+  await page.evaluate(() => recordRoll('secret', 13, ''));
+  await p2.waitForTimeout(300);
+  assert.ok(!(await p2.evaluate(() => document.getElementById('player-roll').classList.contains('show'))), 'unshared roll shown to players');
+  await page.evaluate(() => { const c = document.getElementById('dice-share'); c.checked = true; c.dispatchEvent(new Event('change')); recordRoll('d20', 17, 'd20:[17]=17'); });
+  await p2.waitForTimeout(300);
+  assert.deepStrictEqual(await p2.evaluate(() => [document.getElementById('player-roll').classList.contains('show'), document.querySelector('#player-roll .pr-total').textContent]), [true, '17']);
+  await page.evaluate(() => { const c = document.getElementById('dice-share'); c.checked = false; c.dispatchEvent(new Event('change')); });
 
   // Pinch zoom
   const cdp = await ctx.newCDPSession(page);
