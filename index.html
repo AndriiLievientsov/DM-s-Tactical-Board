@@ -159,6 +159,14 @@
         .tab-content.active { display: block; }
 
         .tree-actions { margin-bottom: 15px; display: flex; gap: 5px; }
+        .enc-title { font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: .5px; margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .enc-list { list-style: none; }
+        .enc-list li { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: #1b1b22; border-radius: 5px; margin-bottom: 5px; font-size: 13px; }
+        .enc-list li .enc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .enc-list li .enc-count { color: #777; font-size: 11px; }
+        .enc-list li button { background: #2a2a33; border: 1px solid #383842; color: #ddd; border-radius: 4px; cursor: pointer; padding: 3px 7px; font-size: 12px; }
+        .enc-list li button.enc-fight { background: #3a1a1a; border-color: #c62828; color: #ff9090; }
+        .enc-empty { color: #555; font-size: 12px; padding: 4px 2px; }
         .tree-btn { flex: 1; padding: 6px; font-size: 12px; background: #32323d; border: none; color: white; border-radius: 4px; cursor: pointer; }
         .tree-btn:hover { background: #41414f; }
 
@@ -416,6 +424,11 @@
                     <button class="tree-btn" id="create-folder-btn">📁 + Папка</button>
                 </div>
                 <ul class="file-tree-list" id="file-tree"></ul>
+                <div class="enc-title">⚔️ Готовые встречи</div>
+                <div class="tree-actions">
+                    <button class="tree-btn" id="enc-save-btn" title="Выдели токены рамкой (V) и сохрани их как встречу">＋ Встреча из выделенных</button>
+                </div>
+                <ul class="enc-list" id="enc-list"></ul>
             </div>
             <div id="tab-initiative" class="tab-content">
                 <div class="init-toolbar">
@@ -1144,7 +1157,11 @@ function normalizeAdventure(raw) {
             .map((c, j) => ({ id: c.id ?? (Date.now() + j + Math.random()), name: String(c.name ?? ''), data: c.data })),
     }));
     const currentLocationId = locations.some(l => l.id === raw.currentLocationId) ? raw.currentLocationId : locations[0].id;
-    return { version: ADVENTURE_VERSION, locations, currentLocationId, library, notes: typeof raw.notes === 'string' ? raw.notes : '' };
+    const encounters = arr(raw.encounters).filter(e => e && typeof e === 'object' && Array.isArray(e.tokens)).map((e, i) => ({
+        id: e.id ?? (Date.now() + i), name: String(e.name ?? 'Встреча'),
+        tokens: e.tokens.filter(t => t && typeof t === 'object').map(t => ({ ...t, dx: num(t.dx, 0), dy: num(t.dy, 0), radius: num(t.radius, 25), name: String(t.name ?? '') })),
+    }));
+    return { version: ADVENTURE_VERSION, locations, currentLocationId, library, encounters, notes: typeof raw.notes === 'string' ? raw.notes : '' };
 }
 
 // Replace the live adventure with validated data and refresh all UI
@@ -1154,7 +1171,7 @@ function applyAdventure(data) {
     loadViewFromLocation(getCurrentLocation());
     state.initiative = { combatants: [], currentIndex: -1, round: 1 };
     state.selectedTokenIds = new Set();
-    updateZoomUI(); renderLocations(); renderLibrary(); renderInitiative(); syncNotesUI();
+    updateZoomUI(); renderLocations(); renderLibrary(); renderEncounters(); renderInitiative(); syncNotesUI();
     state.drawingHistory = []; state.drawingHistoryIndex = -1;
     pushHistory(); drawCanvas();
 }
@@ -2652,6 +2669,89 @@ function updateLockButton() {
 }
 
 // ============================================================
+//  ENCOUNTERS — save a group of tokens once, drop it on any map with one click
+// ============================================================
+function saveEncounterFromSelection(name) {
+    const loc = getCurrentLocation(); if (!loc) return null;
+    const picked = loc.tokens.filter(t => state.selectedTokenIds.has(t.id));
+    if (!picked.length) return null;
+    const cx = picked.reduce((a, t) => a + t.x, 0) / picked.length, cy = picked.reduce((a, t) => a + t.y, 0) / picked.length;
+    const enc = {
+        id: Date.now() + Math.random(), name: name || `Встреча ${(state.adventureData.encounters || []).length + 1}`,
+        tokens: picked.map(t => {
+            const { id, x, y, dead, ...rest } = JSON.parse(JSON.stringify(t));
+            if (rest.maxHp) rest.hp = rest.maxHp;
+            return { ...rest, dx: x - cx, dy: y - cy };
+        }),
+    };
+    if (!Array.isArray(state.adventureData.encounters)) state.adventureData.encounters = [];
+    state.adventureData.encounters.push(enc);
+    renderEncounters(); markDirty();
+    return enc;
+}
+// Place at the centre of the visible map; names get numbers if the map already has that creature
+function placeEncounter(encId, toInitiative) {
+    const loc = getCurrentLocation();
+    const enc = (state.adventureData.encounters || []).find(e => e.id === encId);
+    if (!loc || !enc) return [];
+    const z = state.zoomLevel;
+    let cx = (canvas.width / 2 - state.offsetX) / z, cy = (canvas.height / 2 - state.offsetY) / z;
+    if (state.isGridEnabled) ({ x: cx, y: cy } = snapToGrid(cx, cy));
+    state.selectedTokenIds = new Set();
+    const placed = enc.tokens.map((tpl, i) => {
+        const { dx, dy, ...t } = JSON.parse(JSON.stringify(tpl));
+        t.id = Date.now() + i + Math.random();
+        t.x = cx + dx; t.y = cy + dy;
+        if (t.name && loc.tokens.some(o => o.name === t.name || String(o.name || '').startsWith(t.name + ' '))) t.name = nextTokenName(t.name, loc.tokens);
+        loc.tokens.push(t);
+        state.selectedTokenIds.add(t.id);
+        return t;
+    });
+    if (toInitiative) {
+        placed.filter(t => !isObjectToken(t)).forEach(t => addTokenToInitiative(t));
+        state.initiative.combatants.forEach(c => { if (placed.some(t => t.id === c.tokenRef)) c.init = rollDie(20); });
+        state.initiative.combatants.sort((a, b) => b.init - a.init);
+        renderInitiative();
+    }
+    pushHistory(); emit('canvas:redraw');
+    showToast(`⚔️ ${enc.name}: ${placed.length} ${placed.length === 1 ? 'токен' : 'токенов'} на карте${toInitiative ? ' и в инициативе' : ''}`);
+    return placed;
+}
+function renderEncounters() {
+    const list = document.getElementById('enc-list'); if (!list) return;
+    list.innerHTML = '';
+    const encs = state.adventureData.encounters || [];
+    if (!encs.length) {
+        const li = document.createElement('div'); li.className = 'enc-empty';
+        li.textContent = 'Выдели монстров рамкой (V) и нажми «＋ Встреча из выделенных».';
+        list.appendChild(li); return;
+    }
+    encs.forEach(enc => {
+        const li = document.createElement('li');
+        const name = document.createElement('span'); name.className = 'enc-name'; name.textContent = enc.name; name.title = enc.tokens.map(t => t.name || '?').join(', ');
+        const cnt = document.createElement('span'); cnt.className = 'enc-count'; cnt.textContent = `×${enc.tokens.length}`;
+        const place = document.createElement('button'); place.textContent = '▶'; place.title = 'Поставить на карту';
+        place.addEventListener('click', () => placeEncounter(enc.id, false));
+        const fight = document.createElement('button'); fight.className = 'enc-fight'; fight.textContent = '⚔️'; fight.title = 'Поставить, добавить в инициативу и бросить инициативу';
+        fight.addEventListener('click', () => placeEncounter(enc.id, true));
+        const del = document.createElement('button'); del.textContent = '✕'; del.title = 'Удалить встречу';
+        del.addEventListener('click', () => {
+            if (!confirm(`Удалить встречу «${enc.name}»?`)) return;
+            state.adventureData.encounters = encs.filter(e => e.id !== enc.id); renderEncounters(); markDirty();
+        });
+        li.append(name, cnt, place, fight, del);
+        list.appendChild(li);
+    });
+}
+function initEncounters() {
+    document.getElementById('enc-save-btn').addEventListener('click', () => {
+        if (!state.selectedTokenIds.size) { showToast('Сначала выдели токены рамкой (V)'); return; }
+        showInlinePrompt('Название встречи', `Встреча ${(state.adventureData.encounters || []).length + 1}`, (val) => saveEncounterFromSelection(val.trim()));
+    });
+    renderEncounters();
+}
+
+// ============================================================
 //  TOKEN CONTEXT MENU — header with stats, open card, duplicate with numbering, z-order
 // ============================================================
 function menuTargetToken() {
@@ -3691,6 +3791,7 @@ initPropsPanel();
 initStatBlock();
 initHpPopup();
 initHelp();
+initEncounters();
 renderLocations();
 renderLibrary();
 renderInitiative();
