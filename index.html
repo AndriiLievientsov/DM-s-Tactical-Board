@@ -112,6 +112,16 @@
         #dice-toggle-btn.active { background: #7b2fff; color: white; border-color: #9b5fff; }
         #dice-popup { position: absolute; top: calc(100% + 8px); right: 0; background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; width: 220px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
         #dice-popup.show { display: block; }
+        #hp-popup { position: absolute; top: calc(100% + 8px); left: 0; background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; width: 230px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
+        #hp-popup.show { display: block; }
+        #hp-popup input { width: 100%; background: #14141a; border: 1px solid #383842; color: #e3e3e6; padding: 6px 8px; border-radius: 4px; font-size: 16px; text-align: center; outline: none; margin-bottom: 8px; }
+        #hp-popup .hp-actions { display: flex; gap: 6px; }
+        #hp-popup .hp-actions button { flex: 1; padding: 7px 4px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; border: 1px solid; }
+        #hp-dmg-btn { background: #3a1a1a; border-color: #c62828 !important; color: #ff9090; }
+        #hp-heal-btn { background: #1a3a1a; border-color: #2e7d32 !important; color: #81c784; }
+        #hp-popup-target { font-size: 11px; color: #888; margin-bottom: 8px; line-height: 1.4; }
+        .init-item.dead { opacity: .45; }
+        .init-item.dead .init-name { text-decoration: line-through; }
         #dice-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
         #dice-buttons .system-btn { padding: 6px 4px; font-size: 12px; text-align: center; font-weight: bold; }
         #dice-result { font-size: 20px; color: #ffd166; font-weight: bold; text-align: center; min-height: 28px; margin-bottom: 8px; }
@@ -229,6 +239,17 @@
             <div class="controls-group">
                 <button class="zoom-btn" id="btn-copy-tokens" title="Копировать выделенные токены (Ctrl+C)" style="width:auto; padding:0 8px; font-size:12px;">⎘ Копировать</button>
                 <button class="zoom-btn" id="btn-paste-tokens" title="Вставить токены (Ctrl+V)" style="width:auto; padding:0 8px; font-size:12px;">⎙ Вставить</button>
+                <div class="dice-container">
+                    <button class="zoom-btn" id="btn-hp-group" title="Урон или лечение выделенным токенам" style="width:auto; padding:0 8px; font-size:12px;">❤️ Урон/лечение</button>
+                    <div id="hp-popup">
+                        <div id="hp-popup-target"></div>
+                        <input id="hp-amount" type="number" min="0" placeholder="Сколько HP" aria-label="Количество HP">
+                        <div class="hp-actions">
+                            <button id="hp-dmg-btn">💔 Урон</button>
+                            <button id="hp-heal-btn">❤️ Лечение</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="mode-container">
@@ -494,6 +515,7 @@
         <li id="token-menu-initiative">⚔️ В инициативу</li>
         <li data-action="hp-plus5" style="color:#81c784;">❤️ +5 HP</li>
         <li data-action="hp-minus5" style="color:#ff9090;">💔 −5 HP</li>
+        <li data-action="toggle-dead">💀 Мёртв / жив</li>
         <li data-action="copy-token">⎘ Копировать</li>
         <li data-action="delete-token" style="color: var(--accent-color);">❌ Удалить токен</li>
     </ul>
@@ -787,6 +809,83 @@ function editTokenName() {
         t.name = val; pushHistory(); emit('canvas:redraw');
     });
 }
+// ============================================================
+//  DAMAGE / HEALING — applied to every selected token at once; 0 HP marks the token dead
+// ============================================================
+function isTokenDead(t) {
+    if (t.dead) return true;
+    return !!t.maxHp && t.hp !== undefined && t.hp !== null && t.hp !== '' && parseInt(t.hp) <= 0;
+}
+function drawDeadMark(sx, sy, sr) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
+    const d = sr * 0.6;
+    ctx.strokeStyle = '#e53935'; ctx.lineWidth = Math.max(3, sr * 0.16); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(sx - d, sy - d); ctx.lineTo(sx + d, sy + d); ctx.moveTo(sx + d, sy - d); ctx.lineTo(sx - d, sy + d); ctx.stroke();
+    ctx.restore();
+}
+// Tokens the damage/heal popup acts on: the selection, else the token open in the props panel
+function hpTargets() {
+    const loc = getCurrentLocation(); if (!loc) return [];
+    if (state.selectedTokenIds.size) return loc.tokens.filter(t => state.selectedTokenIds.has(t.id));
+    const t = loc.tokens.find(t => t.id === _propsTargetId);
+    return t ? [t] : [];
+}
+function applyHpChange(tokens, delta) {
+    if (!tokens.length || !delta) return;
+    tokens.forEach(t => {
+        const max = parseInt(t.maxHp) || 0;
+        const cur = (t.hp !== undefined && t.hp !== null && t.hp !== '') ? (parseInt(t.hp) || 0) : max;
+        let next = Math.max(0, cur + delta);
+        if (max && delta > 0) next = Math.min(max, next);
+        t.hp = next;
+        if (delta > 0 && next > 0) t.dead = false;
+        state.initiative.combatants.forEach(c => { if (c.tokenRef === t.id) c.hp = next; });
+    });
+    pushHistory(); renderInitiative(); refreshPropsPanel(); emit('canvas:redraw');
+    const names = tokens.map(t => t.name || 'Токен').join(', ');
+    showToast(delta < 0 ? `💔 ${names}: −${-delta} HP` : `❤️ ${names}: +${delta} HP`);
+}
+function toggleTokenDead() {
+    const loc = getCurrentLocation();
+    const t = loc && state.menuTargetTokenIndex !== null ? loc.tokens[state.menuTargetTokenIndex] : null;
+    if (!t) return;
+    if (isTokenDead(t)) { t.dead = false; if (t.maxHp && parseInt(t.hp) <= 0) t.hp = 1; }
+    else t.dead = true;
+    pushHistory(); renderInitiative(); emit('canvas:redraw');
+}
+function initHpPopup() {
+    const btn = document.getElementById('btn-hp-group'), popup = document.getElementById('hp-popup');
+    const amount = document.getElementById('hp-amount'), info = document.getElementById('hp-popup-target');
+    const updateInfo = () => {
+        const ts = hpTargets();
+        info.textContent = ts.length ? `Цели (${ts.length}): ${ts.map(t => t.name || 'Токен').join(', ')}` : 'Выдели токены рамкой (V) или открой токен двойным кликом.';
+    };
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = !popup.classList.contains('show');
+        popup.classList.toggle('show', open);
+        if (open) { updateInfo(); amount.focus(); amount.select(); }
+    });
+    popup.addEventListener('click', (e) => e.stopPropagation());
+    popup.addEventListener('pointerdown', (e) => e.stopPropagation());
+    const apply = (sign) => {
+        const n = Math.abs(parseInt(amount.value) || 0);
+        if (!n) { amount.focus(); return; }
+        applyHpChange(hpTargets(), sign * n);
+        updateInfo();
+    };
+    document.getElementById('hp-dmg-btn').addEventListener('click', () => apply(-1));
+    document.getElementById('hp-heal-btn').addEventListener('click', () => apply(+1));
+    amount.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') apply(e.shiftKey ? +1 : -1);
+        if (e.key === 'Escape') popup.classList.remove('show');
+    });
+    document.addEventListener('click', () => popup.classList.remove('show'));
+}
+
 function editTokenHP() {
     const loc = getCurrentLocation();
     if (!loc || state.menuTargetTokenIndex === null || !loc.tokens[state.menuTargetTokenIndex]) return;
@@ -1421,6 +1520,7 @@ async function drawTokens(tokens, z, ox, oy) {
             ctx.fillStyle = 'purple'; ctx.fill();
             ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
         }
+        if (isTokenDead(t)) drawDeadMark(sx, sy, sr);
         // HP bar — thin colored strip under the token (DM only)
         if (!isPlayer && t.hp !== undefined && t.hp !== null && t.hp !== '' && t.maxHp) {
             const pct = Math.max(0, Math.min(1, parseInt(t.hp) / parseInt(t.maxHp)));
@@ -1953,6 +2053,7 @@ document.getElementById('token-menu').addEventListener('click', (e) => {
         if (action === 'hp-plus5')  quickChangeHP(+5);
         if (action === 'hp-minus5') quickChangeHP(-5);
         if (action === 'copy-token') copyTokenToClipboard();
+        if (action === 'toggle-dead') toggleTokenDead();
         hideAllContextMenus();
     }
 });
@@ -2421,7 +2522,7 @@ function renderInitiative() {
         };
 
         const li = document.createElement('li');
-        li.className = 'init-item' + (isActive ? ' active-turn' : '');
+        li.className = 'init-item' + (isActive ? ' active-turn' : '') + (token && isTokenDead(token) ? ' dead' : '');
 
         // Build HP block
         const hpVal = c.hp !== undefined && c.hp !== '' ? c.hp : '—';
@@ -2527,13 +2628,18 @@ function showToast(text) {
 }
 document.getElementById('init-next-btn').addEventListener('click', () => {
     if (!state.initiative.combatants.length) return;
-    state.initiative.currentIndex++;
-    if (state.initiative.currentIndex >= state.initiative.combatants.length) {
-        state.initiative.currentIndex = 0;
-        state.initiative.round++;
+    const loc = getCurrentLocation();
+    const deadAt = (i) => { const c = state.initiative.combatants[i]; const t = loc && c ? loc.tokens.find(t => t.id === c.tokenRef) : null; return !!t && isTokenDead(t); };
+    // Advance, skipping dead combatants (unless everyone is dead)
+    for (let n = 0; n < state.initiative.combatants.length; n++) {
+        state.initiative.currentIndex++;
+        if (state.initiative.currentIndex >= state.initiative.combatants.length) {
+            state.initiative.currentIndex = 0;
+            state.initiative.round++;
+        }
+        if (!deadAt(state.initiative.currentIndex)) break;
     }
     const active = state.initiative.combatants[state.initiative.currentIndex];
-    const loc = getCurrentLocation();
     const token = loc && active ? loc.tokens.find(t => t.id === active.tokenRef) : null;
     const expired = tickStatusDurations(token);
     if (token && token.statusRounds && Object.keys(token.statusRounds).length + expired.length) pushHistory();
@@ -3214,6 +3320,7 @@ initColorGrids();
 initDiceRoller();
 initPropsPanel();
 initStatBlock();
+initHpPopup();
 renderLocations();
 renderLibrary();
 renderInitiative();
