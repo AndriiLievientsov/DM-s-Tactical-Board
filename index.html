@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DM's Tactical Board v2</title>
+    <title>DM's Tactical Board V3</title>
     <style>
         :root {
             --bg-color: #1a1a1f;
@@ -17,10 +17,10 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
         /* Upper Panel Structure */
-        header { background: var(--panel-color); border-bottom: 2px solid var(--border-color); padding: 10px 20px; display: flex; align-items: center; user-select: none; z-index: 10; gap: 15px; flex-wrap: nowrap; }
+        header { background: var(--panel-color); border-bottom: 2px solid var(--border-color); padding: 10px 20px; display: flex; align-items: center; user-select: none; z-index: 10; gap: 10px 15px; flex-wrap: wrap; }
 
         .left-block { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .center-block { display: flex; align-items: center; justify-content: center; flex: 1; gap: 10px; }
+        .center-block { display: flex; align-items: center; justify-content: center; flex: 1; gap: 10px; flex-wrap: wrap; }
         .right-block { flex-shrink: 0; font-size: 13px; color: #888; }
 
         .system-btn { background: #32323d; border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; white-space: nowrap; font-size: 13px; }
@@ -46,6 +46,21 @@
         .drawing-popup.show { display: block; }
         .popup-title { font-size: 12px; font-weight: bold; color: #888; margin-bottom: 4px; margin-top: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         .popup-title:first-child { margin-top: 0; }
+
+        /* Token properties panel */
+        .props-field { margin-bottom: 10px; }
+        .props-field label { display:block; font-size:11px; font-weight:bold; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+        .props-field input[type="text"], .props-field input[type="number"] { width:100%; background:#14141a; border:1px solid #383842; color:#e3e3e6; padding:6px 8px; border-radius:4px; font-size:13px; outline:none; }
+        .props-field input:focus { border-color:#ff4a4a; }
+        .props-row { display:flex; gap:8px; }
+        .props-row .props-field { flex:1; }
+        .props-size-btns { display:flex; gap:4px; }
+        .props-size-btn { flex:1; padding:5px 2px; font-size:11px; font-weight:bold; background:#2a2a33; border:1px solid #383842; color:#aaa; border-radius:4px; cursor:pointer; }
+        .props-size-btn:hover, .props-size-btn.active { background:#ff4a4a; border-color:#ff6b6b; color:white; }
+        .props-status-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+        .props-status-btn { padding:5px 2px; font-size:16px; background:#1b1b22; border:1px solid #383842; border-radius:4px; cursor:pointer; text-align:center; transition:.1s; }
+        .props-status-btn:hover { background:#2a2a33; }
+        .props-status-btn.active { background:#1a3a1a; border-color:#2e7d32; box-shadow:0 0 6px rgba(46,125,50,.4); }
 
         /* Fog mode switcher */
         .fog-mode-switcher { display: flex; gap: 4px; margin-bottom: 2px; }
@@ -108,7 +123,7 @@
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         .sidebar { width: 320px; background: var(--panel-color); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; user-select: none; z-index: 5; }
         .tabs { display: flex; border-bottom: 1px solid var(--border-color); background: #1b1b22; }
-        .tab-btn { flex: 1; padding: 12px; background: transparent; border: none; color: #888; cursor: pointer; text-align: center; font-weight: bold; font-size: 13px; }
+        .tab-btn { flex: 1; min-width: 0; padding: 9px 2px; background: transparent; border: none; color: #888; cursor: pointer; text-align: center; font-weight: bold; font-size: 11px; line-height: 1.3; white-space: normal; word-break: keep-all; overflow: hidden; }
         .tab-btn.active { color: var(--text-color); border-bottom: 2px solid var(--accent-color); background: var(--panel-color); }
         .tab-content { flex: 1; padding: 15px; overflow-y: auto; display: none; }
         .tab-content.active { display: block; }
@@ -130,7 +145,22 @@
         .file-item { font-size: 13px; background: #14141a; color: #ccc; cursor: grab; }
 
         .canvas-area { flex: 1; position: relative; background: #0d0d11; overflow: hidden; }
-        #game-canvas { width: 100%; height: 100%; display: block; }
+        #game-canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+
+        /* Save status / notes / misc */
+        #save-status { font-size: 11px; color: #777; white-space: nowrap; align-self: center; }
+        #save-status.error { color: #ffb347; font-weight: bold; }
+        #notes-input { width: 100%; height: calc(100vh - 190px); min-height: 160px; resize: vertical; background: #14141a; border: 1px solid var(--border-color); color: var(--text-color); padding: 8px; border-radius: 4px; font: 13px/1.5 'Segoe UI', sans-serif; outline: none; }
+        #notes-input:focus { border-color: var(--accent-color); }
+        .cell-size-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .cell-size-row label { display: block; font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+        .cell-size-row input, .tpl-row input { width: 100%; background: #14141a; border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none; }
+        .tpl-row { margin-top: 8px; }
+        :focus-visible { outline: 2px solid #ffd166; outline-offset: 1px; }
+
+        /* Player window: map only */
+        body.player-view header, body.player-view .sidebar { display: none; }
+        body.player-view #game-canvas { pointer-events: none; }
 
         /* Context menus */
         .ctx-menu-list { position: fixed; background: #2a2a32; border: 1px solid #3f3f4a; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; display: none; z-index: 1000; list-style: none; padding: 5px 0; min-width: 160px; user-select: none; }
@@ -148,10 +178,13 @@
             <button class="system-btn" id="save-adventure-btn">💾 Сохранить</button>
             <button class="system-btn" id="load-adventure-btn">📂 Загрузить</button>
             <input type="file" id="load-adventure-file" style="display:none" accept=".json">
+            <button class="system-btn" id="load-map-btn" title="Загрузить картинку карты для текущей локации">🖼️ Карта</button>
+            <input type="file" id="load-map-file" style="display:none" accept="image/*">
+            <span id="save-status" role="status" aria-live="polite"></span>
 
             <div class="controls-group">
-                <button class="system-btn" id="btn-undo" disabled>↩️</button>
-                <button class="system-btn" id="btn-redo" disabled>↪️</button>
+                <button class="system-btn" id="btn-undo" disabled aria-label="Отменить" title="Отменить (Ctrl+Z)">↩️</button>
+                <button class="system-btn" id="btn-redo" disabled aria-label="Повторить" title="Повторить (Ctrl+Y)">↪️</button>
             </div>
 
             <div class="controls-group">
@@ -161,11 +194,11 @@
             </div>
 
             <div class="controls-group">
-                <button class="zoom-btn" id="zoom-out-btn">−</button>
+                <button class="zoom-btn" id="zoom-out-btn" aria-label="Уменьшить">−</button>
                 <span class="zoom-val" id="zoom-text">100%</span>
-                <button class="zoom-btn" id="zoom-in-btn">＋</button>
+                <button class="zoom-btn" id="zoom-in-btn" aria-label="Увеличить">＋</button>
                 <button class="zoom-btn" id="reset-zoom-btn" style="width: auto; padding: 0 6px; font-size: 11px;">100%</button>
-                <button class="zoom-btn" id="fullscreen-toggle-btn">📺</button>
+                <button class="zoom-btn" id="fullscreen-toggle-btn" aria-label="Полный экран">📺</button>
             </div>
         </div>
 
@@ -235,14 +268,42 @@
             <div class="mode-container">
                 <button class="mode-btn" id="btn-mode-ruler" data-mode="ruler">📏 Линейка</button>
             </div>
+
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-template" data-mode="template" title="Шаблоны заклинаний (T)">🔺 Шаблон</button>
+                <div class="drawing-popup" id="tpl-menu-popup">
+                    <div class="popup-title">Форма</div>
+                    <div class="fog-mode-switcher" id="tpl-shapes">
+                        <button class="fog-mode-btn active" data-tplshape="cone">Конус</button>
+                        <button class="fog-mode-btn" data-tplshape="sphere">Сфера</button>
+                        <button class="fog-mode-btn" data-tplshape="line">Линия</button>
+                        <button class="fog-mode-btn" data-tplshape="cube">Куб</button>
+                    </div>
+                    <div class="tpl-row">
+                        <div class="popup-title">Размер (футы)</div>
+                        <input type="number" id="tpl-size" min="5" max="500" step="5" value="20">
+                    </div>
+                    <div style="font-size:11px;color:#888;margin-top:8px;line-height:1.5;">
+                        Нажми и тяни по карте — задаёт точку и направление.<br>Esc — убрать шаблон.
+                    </div>
+                    <button class="tree-btn" id="tpl-clear-btn" style="margin-top:8px;width:100%;">✖ Убрать шаблон</button>
+                </div>
+            </div>
         </div>
 
         <div class="right-block">
+            <button class="system-btn" id="open-player-btn" title="Открыть окно для игроков (без тумана-превью и панелей) — перетащи на проектор" style="margin-right:8px;">🖥️ Игрокам</button>
             <div class="dice-container">
                 <button id="dice-toggle-btn">🎲 Кубики</button>
                 <div id="dice-popup">
                     <div id="dice-buttons"></div>
+                    <div style="display:flex;gap:4px;margin-bottom:8px;">
+                        <input id="dice-formula" type="text" placeholder="2d6+3, 4d6kh3…"
+                            style="flex:1;background:#14141a;border:1px solid #383842;color:#e3e3e6;padding:5px 8px;border-radius:4px;font-size:12px;outline:none;">
+                        <button id="dice-roll-formula" style="background:#7b2fff;border:none;color:white;padding:5px 10px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;">⚄</button>
+                    </div>
                     <div id="dice-result"></div>
+                    <div id="dice-detail" style="font-size:11px;color:#888;text-align:center;margin-bottom:6px;min-height:14px;"></div>
                     <ul id="dice-history"></ul>
                 </div>
             </div>
@@ -252,15 +313,24 @@
     <div class="main-container">
         <aside class="sidebar">
             <div class="tabs">
-                <button class="tab-btn active" data-tab="locations">📍 Локации</button>
-                <button class="tab-btn" data-tab="library">📁 Библиотека</button>
-                <button class="tab-btn" data-tab="initiative">⚔️ Инициатива</button>
+                <button class="tab-btn active" data-tab="locations">📍<br>Локации</button>
+                <button class="tab-btn" data-tab="library">📁<br>Библиотека</button>
+                <button class="tab-btn" data-tab="initiative">⚔️<br>Инициатива</button>
+                <button class="tab-btn" data-tab="props">🎭<br>Токен</button>
+                <button class="tab-btn" data-tab="notes">📝<br>Заметки</button>
             </div>
             <div id="tab-locations" class="tab-content active">
                 <div class="tree-actions">
                     <button class="tree-btn" id="add-location-btn">＋ Новая локация</button>
                 </div>
                 <ul class="location-list" id="location-list"></ul>
+                <div class="cell-size-row">
+                    <label for="cell-size-input">Размер клетки на карте (px)</label>
+                    <input type="number" id="cell-size-input" min="20" max="300" step="1" value="50">
+                </div>
+            </div>
+            <div id="tab-notes" class="tab-content">
+                <textarea id="notes-input" placeholder="Заметки мастера: сюжет, секреты, ловушки… Сохраняются вместе с приключением." aria-label="Заметки мастера"></textarea>
             </div>
             <div id="tab-library" class="tab-content">
                 <div class="tree-actions">
@@ -272,12 +342,56 @@
                 <div class="init-toolbar">
                     <button id="init-import-btn">⬇️ Импорт токенов</button>
                     <button id="init-add-btn">＋ Добавить</button>
+                    <button id="init-roll-btn" title="Бросить d20 инициативы всем и отсортировать">🎲 Бросить всем</button>
                     <button id="init-sort-btn">↕️ Сортировать</button>
                     <button id="init-clear-btn">🗑️</button>
                 </div>
                 <button class="init-toolbar" style="width:100%; margin-bottom:8px; padding:8px; background:#1a3a1a; border:1px solid #2e7d32; border-radius:4px; color:#81c784; font-weight:bold; cursor:pointer; font-size:13px;" id="init-next-btn">▶ Следующий ход</button>
                 <div class="init-round">Раунд: <span id="init-round-num">1</span></div>
                 <ul class="init-list" id="init-list"></ul>
+            </div>
+            <div id="tab-props" class="tab-content">
+                <div id="props-empty" style="color:#555;font-size:12px;text-align:center;padding:20px 0;">
+                    Выберите токен на карте (двойной клик)
+                </div>
+                <div id="props-panel" style="display:none;">
+                    <div class="props-field">
+                        <label>Имя</label>
+                        <input id="prop-name" type="text" placeholder="Имя токена">
+                    </div>
+                    <div class="props-row">
+                        <div class="props-field">
+                            <label>HP</label>
+                            <input id="prop-hp" type="number" placeholder="0" min="0">
+                        </div>
+                        <div class="props-field">
+                            <label>Макс. HP</label>
+                            <input id="prop-maxhp" type="number" placeholder="0" min="0">
+                        </div>
+                    </div>
+                    <div class="props-field">
+                        <label>Размер</label>
+                        <div class="props-size-btns">
+                            <button class="props-size-btn" data-mul="0.5">0.5×</button>
+                            <button class="props-size-btn" data-mul="1">1×</button>
+                            <button class="props-size-btn" data-mul="2">2×</button>
+                            <button class="props-size-btn" data-mul="3">3×</button>
+                            <button class="props-size-btn" data-mul="4">4×</button>
+                        </div>
+                    </div>
+                    <div class="props-field">
+                        <label>Поворот</label>
+                        <div style="display:flex;gap:6px;">
+                            <button class="tree-btn" id="prop-rot-left">↺ −90°</button>
+                            <button class="tree-btn" id="prop-rot-right">↻ +90°</button>
+                            <button class="tree-btn" id="prop-rot-reset">↕ 0°</button>
+                        </div>
+                    </div>
+                    <div class="props-field">
+                        <label>Статусы</label>
+                        <div class="props-status-grid" id="props-status-grid"></div>
+                    </div>
+                </div>
             </div>
         </aside>
 
@@ -327,6 +441,9 @@
             </ul>
         </li>
         <li id="token-menu-initiative">⚔️ В инициативу</li>
+        <li data-action="hp-plus5" style="color:#81c784;">❤️ +5 HP</li>
+        <li data-action="hp-minus5" style="color:#ff9090;">💔 −5 HP</li>
+        <li data-action="copy-token">⎘ Копировать</li>
         <li data-action="delete-token" style="color: var(--accent-color);">❌ Удалить токен</li>
     </ul>
 
@@ -336,6 +453,12 @@
     </ul>
 
 <script>
+// ============================================================
+//  HELPERS
+// ============================================================
+const isPlayer = new URLSearchParams(location.search).has('player');
+const esc = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 // ============================================================
 //  INLINE PROMPT — custom dialog that works in fullscreen
 // ============================================================
@@ -462,6 +585,16 @@ const state = {
     selectionTokenStartPos: [],
     // Clipboard
     clipboard: [],
+    _pasteCount: 0,
+    // AoE spell templates
+    tplShape: 'cone',               // 'cone' | 'sphere' | 'line' | 'cube'
+    tplSize: 20,                    // feet
+    tplStart: null,
+    tplEnd: null,
+    tplDragging: false,
+    // Hotkeys
+    _spaceDown: false,
+    _prevMode: null,
 };
 
 // EventEmitter
@@ -505,22 +638,28 @@ function toggleGridColor() {
 function setCurrentMode(mode) { state.currentMode = mode; emit('mode:change', mode); }
 function syncCurrentLocationState() {
     const loc = getCurrentLocation();
-    if (loc) { loc.zoomLevel = state.zoomLevel; loc.offsetX = state.offsetX; loc.offsetY = state.offsetY; }
+    if (loc) { loc.zoomLevel = state.zoomLevel; loc.offsetX = state.offsetX; loc.offsetY = state.offsetY; loc.cellSize = state.cellSize; }
+}
+// Apply a location's saved view (zoom / pan / cell size) to the live state
+function loadViewFromLocation(loc) {
+    if (!loc) return;
+    state.zoomLevel = loc.zoomLevel !== undefined ? loc.zoomLevel : 1.0;
+    state.offsetX   = loc.offsetX   !== undefined ? loc.offsetX   : 50;
+    state.offsetY   = loc.offsetY   !== undefined ? loc.offsetY   : 50;
+    state.cellSize  = loc.cellSize  || 50;
+    const inp = document.getElementById('cell-size-input');
+    if (inp) inp.value = state.cellSize;
 }
 function setCurrentLocationId(id) {
-    const old = getCurrentLocation();
-    if (old) { old.zoomLevel = state.zoomLevel; old.offsetX = state.offsetX; old.offsetY = state.offsetY; }
+    syncCurrentLocationState();
     state.adventureData.currentLocationId = id;
-    const newLoc = getCurrentLocation();
-    if (newLoc) {
-        state.zoomLevel = newLoc.zoomLevel !== undefined ? newLoc.zoomLevel : 1.0;
-        state.offsetX   = newLoc.offsetX   !== undefined ? newLoc.offsetX   : 50;
-        state.offsetY   = newLoc.offsetY   !== undefined ? newLoc.offsetY   : 50;
-    }
+    loadViewFromLocation(getCurrentLocation());
+    // History snapshots cover one location only — start a fresh one so Undo can't leak state across locations
+    state.drawingHistory = []; state.drawingHistoryIndex = -1; pushHistory();
     emit('zoom:change', state.zoomLevel); emit('locations:update'); emit('canvas:redraw');
 }
 function addLocation(name) {
-    const loc = { id: Date.now(), name, bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50 };
+    const loc = { id: Date.now(), name, bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50, cellSize: 50 };
     state.adventureData.locations.push(loc);
     emit('locations:update');
 }
@@ -594,8 +733,16 @@ function editTokenHP() {
 function deleteSelectedToken() {
     const loc = getCurrentLocation();
     if (loc && state.menuTargetTokenIndex !== null) {
+        const removed = loc.tokens[state.menuTargetTokenIndex];
         loc.tokens.splice(state.menuTargetTokenIndex, 1);
         state.menuTargetTokenIndex = null;
+        if (removed) {
+            state.initiative.combatants = state.initiative.combatants.filter(c => String(c.tokenRef) !== String(removed.id));
+            if (state.initiative.currentIndex >= state.initiative.combatants.length) {
+                state.initiative.currentIndex = state.initiative.combatants.length - 1;
+            }
+            renderInitiative();
+        }
         pushHistory(); emit('canvas:redraw');
     }
 }
@@ -618,10 +765,24 @@ function deleteSelectedFog() {
 // ============================================================
 //  UNDO / REDO
 // ============================================================
+// Token images (base64) are interned so each history snapshot stores a short reference instead of megabytes of data
+let _srcPool = [];
+const _srcIndex = new Map();
+function snapshotLocation(loc) {
+    return JSON.stringify({ tokens: loc.tokens, drawings: loc.drawings, fog: loc.fog }, (k, v) => {
+        if (k === 'src' && typeof v === 'string') {
+            let i = _srcIndex.get(v);
+            if (i === undefined) { i = _srcPool.length; _srcPool.push(v); _srcIndex.set(v, i); }
+            return '@@src:' + i;
+        }
+        return v;
+    });
+}
 function pushHistory() {
     const loc = getCurrentLocation();
     if (!loc) return;
-    const snap = JSON.stringify({ tokens: loc.tokens, drawings: loc.drawings, fog: loc.fog });
+    if (state.drawingHistory.length === 0) { _srcPool = []; _srcIndex.clear(); }
+    const snap = snapshotLocation(loc);
     if (state.drawingHistoryIndex < state.drawingHistory.length - 1) {
         state.drawingHistory = state.drawingHistory.slice(0, state.drawingHistoryIndex + 1);
     }
@@ -629,6 +790,7 @@ function pushHistory() {
     if (state.drawingHistory.length > 50) state.drawingHistory.shift();
     else state.drawingHistoryIndex++;
     updateUndoRedoButtons();
+    markDirty();
 }
 function undo() {
     if (state.drawingHistoryIndex <= 0) return;
@@ -643,10 +805,10 @@ function redo() {
 function restoreHistory(snap) {
     const loc = getCurrentLocation();
     if (!loc || !snap) return;
-    const data = JSON.parse(snap);
+    const data = JSON.parse(snap, (k, v) => (typeof v === 'string' && v.startsWith('@@src:')) ? _srcPool[+v.slice(6)] : v);
     loc.tokens = data.tokens; loc.drawings = data.drawings; loc.fog = data.fog;
-    state.imageCache.clear();
     updateUndoRedoButtons();
+    markDirty();
     emit('canvas:redraw');
 }
 function updateUndoRedoButtons() {
@@ -667,6 +829,138 @@ function loadImage(src, cacheKey) {
     });
 }
 
+// Compress image to maxPx on longest side, returns base64 via callback.
+// Backgrounds are JPEG; tokens keep transparency (WebP, falls back to PNG where unsupported).
+function compressImageFile(file, maxPx, callback, keepAlpha = false) {
+    const reader = new FileReader();
+    reader.onerror = () => alert('Не удалось прочитать файл изображения.');
+    reader.onload = (ev) => {
+        const img = new Image();
+        img.onerror = () => alert(`Не удалось открыть «${file.name}» как изображение.`);
+        img.onload = () => {
+            const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+            const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+            const c = document.createElement('canvas'); c.width = w; c.height = h;
+            c.getContext('2d').drawImage(img, 0, 0, w, h);
+            callback(keepAlpha ? c.toDataURL('image/webp', 0.9) : c.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+function compressTokenFile(file, callback) { compressImageFile(file, 512, callback, true); }
+
+// ============================================================
+//  ADVENTURE DATA — validation / normalisation (import + recovery)
+// ============================================================
+const ADVENTURE_VERSION = 3;
+function normalizeAdventure(raw) {
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.locations) || !raw.locations.length)
+        throw new Error('Некорректный файл приключения');
+    const num = (v, d) => Number.isFinite(v) ? v : d;
+    const arr = (v) => Array.isArray(v) ? v : [];
+    const locations = raw.locations.filter(l => l && typeof l === 'object').map((l, i) => ({
+        id: l.id ?? (Date.now() + i),
+        name: String(l.name ?? `Локация ${i + 1}`),
+        bgData: typeof l.bgData === 'string' ? l.bgData : null,
+        tokens: arr(l.tokens).filter(t => t && typeof t === 'object').map((t, j) => ({
+            ...t,
+            id: t.id ?? (Date.now() + j + Math.random()),
+            x: num(t.x, 0), y: num(t.y, 0), radius: num(t.radius, 25),
+            name: String(t.name ?? ''), rotation: num(t.rotation, 0),
+            statuses: arr(t.statuses).map(String),
+        })),
+        drawings: arr(l.drawings).filter(d => d && Array.isArray(d.points)),
+        fog: arr(l.fog).filter(a => a && Array.isArray(a.points)),
+        zoomLevel: num(l.zoomLevel, 1.0), offsetX: num(l.offsetX, 50), offsetY: num(l.offsetY, 50),
+        cellSize: num(l.cellSize, 50),
+    }));
+    if (!locations.length) throw new Error('Нет ни одной локации');
+    const library = arr(raw.library).filter(f => f && typeof f === 'object').map((f, i) => ({
+        id: f.id ?? (Date.now() + i), name: String(f.name ?? 'Папка'), type: 'folder',
+        collapsed: !!f.collapsed,
+        children: arr(f.children).filter(c => c && typeof c.data === 'string')
+            .map((c, j) => ({ id: c.id ?? (Date.now() + j + Math.random()), name: String(c.name ?? ''), data: c.data })),
+    }));
+    const currentLocationId = locations.some(l => l.id === raw.currentLocationId) ? raw.currentLocationId : locations[0].id;
+    return { version: ADVENTURE_VERSION, locations, currentLocationId, library, notes: typeof raw.notes === 'string' ? raw.notes : '' };
+}
+
+// Replace the live adventure with validated data and refresh all UI
+function applyAdventure(data) {
+    state.adventureData = normalizeAdventure(data);
+    state.imageCache.clear();
+    loadViewFromLocation(getCurrentLocation());
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    state.selectedTokenIds = new Set();
+    updateZoomUI(); renderLocations(); renderLibrary(); renderInitiative(); syncNotesUI();
+    state.drawingHistory = []; state.drawingHistoryIndex = -1;
+    pushHistory(); drawCanvas();
+}
+
+// ============================================================
+//  AUTOSAVE — IndexedDB (hundreds of MB of quota; localStorage's ~5 MB overflows with base64 maps)
+//  Two slots: "autosave" (current session) and "recovery" (copy of the previous session, offered on start)
+// ============================================================
+const AUTOSAVE_KEY = 'autosave', RECOVERY_KEY = 'recovery';
+let _dbPromise = null;
+function getDB() {
+    if (!_dbPromise) _dbPromise = new Promise((resolve, reject) => {
+        if (!window.indexedDB) return reject(new Error('IndexedDB недоступен'));
+        const req = indexedDB.open('dms_tactical_board', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('kv');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+    return _dbPromise;
+}
+async function idbPut(key, val) {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(val, key);
+        tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+    });
+}
+async function idbGet(key) {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+        const req = db.transaction('kv').objectStore('kv').get(key);
+        req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+    });
+}
+
+function setSaveStatus(text, isError) {
+    const el = document.getElementById('save-status'); if (!el) return;
+    el.textContent = text; el.classList.toggle('error', !!isError);
+}
+let _dirty = false, _saveTimer = null;
+function markDirty() {
+    if (isPlayer) return;
+    _dirty = true;
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(saveAutosave, 2000);
+}
+async function saveAutosave() {
+    if (isPlayer || !_dirty) return;
+    clearTimeout(_saveTimer);
+    syncCurrentLocationState();
+    try {
+        await idbPut(AUTOSAVE_KEY, JSON.stringify(state.adventureData));
+        _dirty = false;
+        setSaveStatus('✓ Автосохранено ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), false);
+    } catch (e) {
+        console.warn('Autosave failed:', e);
+        setSaveStatus('⚠ Автосохранение не удалось — сохраните в файл!', true);
+    }
+}
+setInterval(saveAutosave, 30000);
+window.addEventListener('pagehide', saveAutosave);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveAutosave(); });
+
+const adventureHasContent = (a) => a && Array.isArray(a.locations) &&
+    (a.locations.length > 1 || a.locations.some(l => l.bgData || (l.tokens && l.tokens.length) || (l.fog && l.fog.length) || (l.drawings && l.drawings.length)) || a.notes);
+
 // ============================================================
 //  CANVAS RENDERER
 // ============================================================
@@ -682,6 +976,7 @@ window.addEventListener('resize', resizeCanvas);
 
 async function drawCanvas() {
     if (!ctx) return;
+    scheduleBroadcast();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#0d0d11";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -689,7 +984,7 @@ async function drawCanvas() {
     const loc = getCurrentLocation();
     if (!loc) return;
 
-    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    let z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
     let mapW = canvas.width, mapH = canvas.height;
 
     const drawLayers = async (mw, mh) => {
@@ -698,16 +993,23 @@ async function drawCanvas() {
         await drawTokens(loc.tokens, z, ox, oy);
         drawInitiativeHighlight(loc.tokens, z, ox, oy);
         drawFogOfWar(loc.fog, z, ox, oy);
-        drawRuler(z, ox, oy);
+        if (!isPlayer) drawRuler(z, ox, oy);
+        drawTemplate(z, ox, oy);
         drawPings(z, ox, oy);
-        drawSelectionOverlay(z, ox, oy);
-        drawDynamicRulers(mw, mh, z, ox, oy);
+        if (!isPlayer) {
+            drawSelectionOverlay(z, ox, oy);
+            drawDynamicRulers(mw, mh, z, ox, oy);
+        }
     };
 
     if (loc.bgData) {
         try {
             const img = await loadImage(loc.bgData, `bg_${loc.id}`);
             mapW = img.width; mapH = img.height;
+            if (isPlayer) {   // player window: always fit the whole map to the screen
+                z = Math.min(canvas.width / mapW, canvas.height / mapH);
+                ox = (canvas.width - mapW * z) / 2; oy = (canvas.height - mapH * z) / 2;
+            }
             ctx.drawImage(img, ox, oy, mapW * z, mapH * z);
             await drawLayers(mapW, mapH);
         } catch {
@@ -892,28 +1194,48 @@ async function drawTokens(tokens, z, ox, oy) {
             ctx.fillStyle = 'purple'; ctx.fill();
             ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
         }
+        // HP bar — thin colored strip under the token (DM only)
+        if (!isPlayer && t.hp !== undefined && t.hp !== null && t.hp !== '' && t.maxHp) {
+            const pct = Math.max(0, Math.min(1, parseInt(t.hp) / parseInt(t.maxHp)));
+            const bw = sr * 2, bh = Math.max(4, sr * 0.18);
+            const bx = sx - sr, by = sy + sr + 4;
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx, by, bw, bh);
+            ctx.fillStyle = pct > 0.5 ? '#4caf50' : pct > 0.25 ? '#ffc107' : '#f44336';
+            ctx.fillRect(bx, by, bw * pct, bh);
+            ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1;
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.restore();
+        }
         // Selection highlight ring
         if (state.selectedTokenIds.has(t.id)) {
             ctx.beginPath(); ctx.arc(sx, sy, sr + 4, 0, Math.PI * 2);
             ctx.strokeStyle = '#29b6f6'; ctx.lineWidth = 2.5;
             ctx.setLineDash([5, 3]); ctx.stroke(); ctx.setLineDash([]);
         }
-        // Status icons
+        // Status icons — badges OUTSIDE the token ring, arc above the token
         if (t.statuses && t.statuses.length > 0) {
-            const iconSize = Math.max(10, Math.min(18, sr * 0.55));
-            ctx.font = `${iconSize}px serif`;
+            const n = t.statuses.length;
+            const badgeR = Math.max(9, Math.min(14, sr * 0.38));
+            const orbit  = sr + badgeR + 5;
+            const iconSz = badgeR * 1.25;
+            const spreadDeg = Math.min(160, 40 + n * 28);
+            const startAngle = (-Math.PI / 2) - (spreadDeg / 2) * (Math.PI / 180);
+            const step = n > 1 ? (spreadDeg * Math.PI / 180) / (n - 1) : 0;
+
+            ctx.save();
+            ctx.font = `${iconSz}px serif`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             t.statuses.forEach((icon, idx) => {
-                const angle = (idx / t.statuses.length) * Math.PI * 2 - Math.PI / 2;
-                const ix = sx + Math.cos(angle) * (sr * 0.72);
-                const iy = sy + Math.sin(angle) * (sr * 0.72);
-                // Small dark background circle
-                ctx.save();
-                ctx.beginPath(); ctx.arc(ix, iy, iconSize * 0.6, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
-                ctx.restore();
-                ctx.fillText(icon, ix, iy);
+                const angle = startAngle + idx * step;
+                const bx2 = sx + Math.cos(angle) * orbit;
+                const by2 = sy + Math.sin(angle) * orbit;
+                ctx.beginPath(); ctx.arc(bx2, by2, badgeR, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(10,10,16,0.82)'; ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+                ctx.fillText(icon, bx2, by2);
             });
+            ctx.restore();
         }
         ctx.font = `bold ${Math.max(10, Math.min(20, 12 * z))}px 'Segoe UI', sans-serif`;
         ctx.textAlign = "center"; ctx.textBaseline = "top";
@@ -923,7 +1245,7 @@ async function drawTokens(tokens, z, ox, oy) {
             ctx.strokeText(t.name, sx, ty); ctx.fillText(t.name, sx, ty);
             ty += Math.max(10, Math.min(20, 12 * z)) + 2;
         }
-        if (t.hp !== undefined && t.hp !== null && t.hp !== "") {
+        if (!isPlayer && t.hp !== undefined && t.hp !== null && t.hp !== "") {
             ctx.fillStyle = "#ff4a4a";
             ctx.strokeText(`HP: ${t.hp}`, sx, ty); ctx.fillText(`HP: ${t.hp}`, sx, ty);
         }
@@ -941,12 +1263,45 @@ function drawRuler(z, ox, oy) {
     ctx.setLineDash([]);
     const dist = Math.hypot(state.rulerEndPoint.x - state.rulerStartPoint.x, state.rulerEndPoint.y - state.rulerStartPoint.y);
     const feet = (dist / state.cellSize) * 5;
-    const text = `${feet % 1 === 0 ? feet : feet.toFixed(1)} фт.`;
+    const cells = dist / state.cellSize;
+    const feetRound = feet % 1 === 0 ? feet : feet.toFixed(1);
+    const cellsRound = cells % 1 === 0 ? cells : cells.toFixed(1);
+    const text = `${feetRound} фт. / ${cellsRound} кл.`;
     ctx.font = `bold ${Math.max(12, 16 * z)}px 'Segoe UI', sans-serif`;
     ctx.fillStyle = '#29b6f6'; ctx.strokeStyle = 'black'; ctx.lineWidth = 4;
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     const mx = (sx + ex) / 2, my = (sy + ey) / 2;
     ctx.strokeText(text, mx, my - 5); ctx.fillText(text, mx, my - 5);
+    ctx.restore();
+}
+
+const TPL_NAMES = { cone: 'Конус', sphere: 'Сфера', line: 'Линия', cube: 'Куб' };
+function drawTemplate(z, ox, oy) {
+    if (!state.tplStart || !state.tplEnd) return;
+    const pxPerFoot = state.cellSize / 5;
+    const L = state.tplSize * pxPerFoot;
+    const st = state.tplStart, en = state.tplEnd;
+    const ang = Math.atan2(en.y - st.y, en.x - st.x);
+    ctx.save();
+    ctx.translate(st.x * z + ox, st.y * z + oy);
+    ctx.scale(z, z);
+    ctx.rotate(ang);
+    ctx.beginPath();
+    if (state.tplShape === 'sphere') ctx.arc(0, 0, L, 0, Math.PI * 2);
+    else if (state.tplShape === 'cone') { ctx.moveTo(0, 0); ctx.lineTo(L, -L / 2); ctx.lineTo(L, L / 2); ctx.closePath(); }
+    else if (state.tplShape === 'line') ctx.rect(0, -pxPerFoot * 2.5, L, pxPerFoot * 5);   // 5 ft wide
+    else ctx.rect(0, -L / 2, L, L);                                                        // cube, origin on a face
+    ctx.fillStyle = 'rgba(255,140,50,0.28)'; ctx.fill();
+    ctx.strokeStyle = '#ff9d4a'; ctx.lineWidth = 2 / z; ctx.stroke();
+    ctx.restore();
+    // origin dot + label
+    const sx = st.x * z + ox, sy = st.y * z + oy;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fillStyle = '#ffd166'; ctx.fill();
+    ctx.font = "bold 13px 'Segoe UI', sans-serif"; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'black'; ctx.fillStyle = '#ffb870';
+    const label = `${TPL_NAMES[state.tplShape]} ${state.tplSize} фт`;
+    ctx.strokeText(label, sx, sy - 8); ctx.fillText(label, sx, sy - 8);
     ctx.restore();
 }
 
@@ -994,7 +1349,52 @@ function drawDynamicRulers(mw, mh, z, ox, oy) {
 // ============================================================
 //  MOUSE / EVENT HANDLERS
 // ============================================================
-canvas.addEventListener('mousedown', (e) => {
+// Pointer events: one code path for mouse, pen and touch. Two fingers = pinch-zoom + pan.
+const _pointers = new Map();
+let _pinch = null, _lpTimer = null, _lpStart = null;
+function cancelActiveGestures() {
+    state.isDraggingToken = false; state.draggedTokenIndex = null; state.isPanningMap = false;
+    state.isDrawingNow = false; state.currentLine = null; state.isSelecting = false; state.selectRect = null;
+    state.isDraggingSelection = false; state.isDrawingFog = false; state.currentFogArea = null;
+    state.fogRectStart = null; state.fogRectPreview = null; state.tplDragging = false;
+}
+function startPinch() {
+    cancelActiveGestures();
+    const [a, b] = [..._pointers.values()];
+    _pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+}
+function updatePinch() {
+    const [a, b] = [..._pointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    const rect = canvas.getBoundingClientRect();
+    const oldZ = state.zoomLevel;
+    const newZ = Math.max(0.2, Math.min(5.0, oldZ * dist / _pinch.dist));
+    const k = newZ / oldZ;
+    state.offsetX = (cx - rect.left) - ((_pinch.cx - rect.left) - state.offsetX) * k;
+    state.offsetY = (cy - rect.top)  - ((_pinch.cy - rect.top)  - state.offsetY) * k;
+    state.zoomLevel = newZ;
+    _pinch = { dist, cx, cy };
+    updateZoomUI(); syncCurrentLocationState(); drawCanvas();
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+    if (isPlayer) return;
+    _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (_pointers.size === 2) { startPinch(); return; }
+    if (_pointers.size > 2) return;
+    if (e.pointerType === 'touch') {   // long-press = ping (Shift+click equivalent)
+        clearTimeout(_lpTimer);
+        _lpStart = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        _lpTimer = setTimeout(() => {
+            if (!_pointers.has(_lpStart.id) || _pointers.size !== 1) return;
+            const r = canvas.getBoundingClientRect();
+            cancelActiveGestures();
+            createPing((_lpStart.x - r.left - state.offsetX) / state.zoomLevel, (_lpStart.y - r.top - state.offsetY) / state.zoomLevel);
+            _lpStart = null;
+        }, 600);
+    }
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* not capturable — window listeners still cover it */ }
     const rect = canvas.getBoundingClientRect();
     const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
     const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
@@ -1069,6 +1469,10 @@ canvas.addEventListener('mousedown', (e) => {
         if (state.currentMode === 'ruler') {
             state.rulerStartPoint = { x: mx, y: my }; state.rulerEndPoint = { x: mx, y: my }; return;
         }
+        if (state.currentMode === 'template') {
+            state.tplStart = { x: mx, y: my }; state.tplEnd = { x: mx + 1, y: my };
+            state.tplDragging = true; drawCanvas(); return;
+        }
         if (state.currentMode === 'move') {
             for (let i = loc.tokens.length - 1; i >= 0; i--) {
                 const t = loc.tokens[i];
@@ -1083,7 +1487,12 @@ canvas.addEventListener('mousedown', (e) => {
     }
 });
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('pointermove', (e) => {
+    if (isPlayer) return;
+    if (_pointers.has(e.pointerId)) _pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (_lpStart && Math.hypot(e.clientX - _lpStart.x, e.clientY - _lpStart.y) > 10) { clearTimeout(_lpTimer); _lpStart = null; }
+    if (_pinch && _pointers.size >= 2) { updatePinch(); return; }
+    if (_pointers.size > 1) return;
     const rect = canvas.getBoundingClientRect();
     const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
     const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
@@ -1119,12 +1528,26 @@ canvas.addEventListener('mousemove', (e) => {
         }
     }
     if (state.currentMode === 'ruler' && state.rulerStartPoint) { state.rulerEndPoint = { x: mx, y: my }; drawCanvas(); return; }
+    if (state.currentMode === 'template' && state.tplDragging) { state.tplEnd = { x: mx, y: my }; drawCanvas(); return; }
     if (state.isDraggingToken && state.draggedTokenIndex !== null && loc.tokens[state.draggedTokenIndex]) {
-        loc.tokens[state.draggedTokenIndex].x = mx; loc.tokens[state.draggedTokenIndex].y = my; drawCanvas();
+        let nx = mx, ny = my;
+        if (state.isGridEnabled) {
+            const cs = state.cellSize;
+            nx = Math.round(mx / cs) * cs;
+            ny = Math.round(my / cs) * cs;
+        }
+        loc.tokens[state.draggedTokenIndex].x = nx;
+        loc.tokens[state.draggedTokenIndex].y = ny;
+        drawCanvas();
     }
 });
 
-window.addEventListener('mouseup', (e) => {
+function onPointerRelease(e) {
+    if (isPlayer) return;
+    _pointers.delete(e.pointerId);
+    clearTimeout(_lpTimer); _lpStart = null;
+    if (_pointers.size < 2) _pinch = null;
+    state.tplDragging = false;
     if (state.isDrawingNow) { state.isDrawingNow = false; state.currentLine = null; pushHistory(); }
     if (state.isSelecting && state.selectRect) {
         // Finalize marquee — select all tokens inside rect
@@ -1167,16 +1590,9 @@ window.addEventListener('mouseup', (e) => {
     if (state.isDraggingToken) { state.isDraggingToken = false; state.draggedTokenIndex = null; pushHistory(); }
     if (state.isPanningMap) { state.isPanningMap = false; syncCurrentLocationState(); }
     canvas.style.cursor = 'default';
-});
-
-// Double-click: close polygon fog
-canvas.addEventListener('dblclick', (e) => {
-    if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length >= 3) {
-        e.preventDefault();
-        const loc = getCurrentLocation(); if (!loc) return;
-        commitPolygonFog(loc);
-    }
-});
+}
+window.addEventListener('pointerup', onPointerRelease);
+window.addEventListener('pointercancel', onPointerRelease);
 
 function commitPolygonFog(loc) {
     if (!loc.fog) loc.fog = [];
@@ -1275,6 +1691,9 @@ document.getElementById('token-menu').addEventListener('click', (e) => {
         if (action === 'delete-token') deleteSelectedToken();
         if (action === 'toggle-status') toggleTokenStatus(li.dataset.status);
         if (action === 'clear-statuses') clearTokenStatuses();
+        if (action === 'hp-plus5')  quickChangeHP(+5);
+        if (action === 'hp-minus5') quickChangeHP(-5);
+        if (action === 'copy-token') copyTokenToClipboard();
         hideAllContextMenus();
     }
 });
@@ -1323,13 +1742,11 @@ dropZone.addEventListener('drop', (e) => {
     const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
     const mx = (e.clientX - rect.left - ox) / z, my = (e.clientY - rect.top - oy) / z;
     if (internal) {
-        addTokenToCurrentLocation({ id: Date.now(), src: internal, x: mx, y: my, radius: 25, name: "", hp: undefined, rotation: 0 });
+        addTokenToCurrentLocation({ id: Date.now(), src: internal, x: mx, y: my, radius: 25, name: "", hp: undefined, maxHp: undefined, rotation: 0 });
     } else {
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            const reader = new FileReader();
-            reader.onload = (ev) => setCurrentBackground(ev.target.result);
-            reader.readAsDataURL(files[0]);
+            compressImageFile(files[0], 1600, (data) => setCurrentBackground(data));
         }
     }
 });
@@ -1363,6 +1780,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
         // Show popup only when clicking the button; hide on mouseleave (see below)
         document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
         document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
+        document.getElementById('tpl-menu-popup').classList.toggle('show', mode === 'template');
         if (mode !== 'ruler') { state.rulerStartPoint = null; state.rulerEndPoint = null; drawCanvas(); }
     });
 });
@@ -1385,7 +1803,7 @@ document.querySelectorAll('.mode-container').forEach(container => {
         const btn = container.querySelector('.mode-btn');
         if (!btn) return;
         const mode = btn.dataset.mode;
-        if (state.currentMode === mode && (mode === 'draw' || mode === 'fog')) {
+        if (state.currentMode === mode && (mode === 'draw' || mode === 'fog' || mode === 'template')) {
             container.querySelector('.drawing-popup')?.classList.add('show');
         }
     });
@@ -1402,6 +1820,7 @@ document.addEventListener('keydown', (e) => {
         if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length > 0) {
             state.fogPolygonPoints = []; state._polyMousePos = null; drawCanvas(); return;
         }
+        if (state.tplStart) { state.tplStart = state.tplEnd = null; state.tplDragging = false; drawCanvas(); return; }
         // Deselect tokens
         if (state.selectedTokenIds.size > 0) {
             state.selectedTokenIds = new Set(); drawCanvas(); return;
@@ -1419,40 +1838,27 @@ document.addEventListener('keydown', (e) => {
 // Save/Load
 document.getElementById('save-adventure-btn').addEventListener('click', () => {
     syncCurrentLocationState();
-    const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.adventureData));
-    const a = document.createElement('a'); a.href = str; a.download = "adventure.json"; a.click();
+    const blob = new Blob([JSON.stringify({ ...state.adventureData, version: ADVENTURE_VERSION })], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+    const a = document.createElement('a'); a.href = url; a.download = `adventure-${stamp}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 document.getElementById('load-adventure-btn').addEventListener('click', () => {
+    if (adventureHasContent(state.adventureData) && !confirm('Загрузить приключение из файла? Текущее состояние будет заменено (несохранённое пропадёт).')) return;
     document.getElementById('load-adventure-file').click();
 });
 document.getElementById('load-adventure-file').addEventListener('click', function() { this.value = null; });
 document.getElementById('load-adventure-file').addEventListener('change', (e) => {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
+    reader.onerror = () => alert('Не удалось прочитать файл.');
     reader.onload = (ev) => {
         try {
-            state.adventureData = JSON.parse(ev.target.result);
-            state.imageCache.clear();
-            // Ensure tokens have all fields
-            state.adventureData.locations.forEach(loc => {
-                loc.tokens.forEach(t => {
-                    if (t.name === undefined) t.name = "";
-                    if (t.rotation === undefined) t.rotation = 0;
-                });
-                if (!loc.fog) loc.fog = [];
-            });
-            const loc = getCurrentLocation() || state.adventureData.locations[0];
-            if (loc) {
-                state.adventureData.currentLocationId = loc.id;
-                state.zoomLevel = loc.zoomLevel !== undefined ? loc.zoomLevel : 1.0;
-                state.offsetX   = loc.offsetX   !== undefined ? loc.offsetX   : 50;
-                state.offsetY   = loc.offsetY   !== undefined ? loc.offsetY   : 50;
-            }
-            updateZoomUI();
-            renderLocations(); renderLibrary(); drawCanvas();
-            state.drawingHistory = []; state.drawingHistoryIndex = -1;
-            pushHistory(); updateUndoRedoButtons();
-        } catch { alert("Ошибка загрузки файла!"); }
+            // Validate first, replace state only on success — a bad file must not wipe the current session
+            applyAdventure(JSON.parse(ev.target.result));
+            markDirty();
+        } catch (err) { alert('Ошибка загрузки файла: ' + (err && err.message ? err.message : 'неверный формат')); }
     };
     reader.readAsText(file);
 });
@@ -1558,7 +1964,7 @@ function renderLocations() {
         const li = document.createElement('li');
         li.className = `tree-item ${loc.id === state.adventureData.currentLocationId ? 'folder-header' : ''}`;
         if (loc.id === state.adventureData.currentLocationId) li.style.color = 'var(--accent-color)';
-        li.innerHTML = `<span class="location-name">📍 ${loc.name}</span>
+        li.innerHTML = `<span class="location-name">📍 ${esc(loc.name)}</span>
             ${state.adventureData.locations.length > 1 ? `<button class="delete-item">×</button>` : ''}`;
         li.querySelector('.location-name').addEventListener('click', () => setCurrentLocationId(loc.id));
         const del = li.querySelector('.delete-item');
@@ -1576,10 +1982,22 @@ function renderLibrary() {
         const folderDiv = document.createElement('div'); folderDiv.className = 'folder-container';
         const header = document.createElement('div'); header.className = 'tree-item folder-header';
         const arrow = folder.collapsed ? '▶' : '▼';
-        header.innerHTML = `<span class="folder-toggle">${arrow} 📁 ${folder.name}</span>
-            <button class="delete-item">×</button>`;
+        header.innerHTML = `<span class="folder-toggle">${arrow} 📁 ${esc(folder.name)}</span>
+            <span><button class="delete-item add-file-btn" title="Добавить изображения токенов" aria-label="Добавить файлы" style="color:#81c784">＋</button><button class="delete-item" aria-label="Удалить папку">×</button></span>`;
         header.querySelector('.folder-toggle').addEventListener('click', () => toggleLibraryFolder(folder.id));
-        header.querySelector('.delete-item').addEventListener('click', (e) => {
+        header.querySelector('.add-file-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
+            input.addEventListener('change', () => {
+                for (const file of input.files) {
+                    const fname = file.name, foldId = folder.id;
+                    compressTokenFile(file, (data) => addFileToFolder(foldId, { name: fname, data }));
+                }
+            });
+            input.click();
+        });
+        header.querySelector('.delete-item:not(.add-file-btn)').addEventListener('click', (e) => {
             e.stopPropagation();
             const msg = folder.children.length > 0
                 ? `Удалить папку "${folder.name}" и все файлы (${folder.children.length} шт.)?`
@@ -1592,9 +2010,8 @@ function renderLibrary() {
         header.addEventListener('drop', (e) => {
             e.preventDefault(); header.classList.remove('drag-over');
             for (const file of e.dataTransfer.files) {
-                const r = new FileReader();
-                r.onload = (ev) => addFileToFolder(folder.id, { name: file.name, data: ev.target.result });
-                r.readAsDataURL(file);
+                const fname = file.name, foldId = folder.id;
+                compressTokenFile(file, (data) => addFileToFolder(foldId, { name: fname, data }));
             }
         });
         const ul = document.createElement('ul');
@@ -1602,7 +2019,7 @@ function renderLibrary() {
         folder.children.forEach(file => {
             const li = document.createElement('li');
             li.className = 'tree-item file-item'; li.setAttribute('draggable', 'true');
-            li.innerHTML = `<span>🖼️ ${file.name}</span><button class="delete-item">×</button>`;
+            li.innerHTML = `<span>🖼️ ${esc(file.name)}</span><button class="delete-item">×</button>`;
             li.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', file.data));
             li.querySelector('.delete-item').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1637,6 +2054,29 @@ document.getElementById('add-location-btn').addEventListener('click', () => {
 document.getElementById('create-folder-btn').addEventListener('click', () => {
     const name = prompt("Название папки:"); if (name) addLibraryFolder(name);
 });
+
+// ============================================================
+//  HP QUICK CHANGE / COPY TOKEN
+// ============================================================
+function quickChangeHP(delta) {
+    const loc = getCurrentLocation();
+    if (!loc || state.menuTargetTokenIndex === null) return;
+    const t = loc.tokens[state.menuTargetTokenIndex];
+    const cur = t.hp !== undefined && t.hp !== '' ? parseInt(t.hp) || 0 : 0;
+    t.hp = Math.max(0, cur + delta);
+    const comb = state.initiative.combatants.find(c => c.tokenRef === t.id);
+    if (comb) comb.hp = t.hp;
+    renderInitiative(); pushHistory(); emit('canvas:redraw');
+}
+function copyTokenToClipboard() {
+    const loc = getCurrentLocation();
+    if (!loc || state.menuTargetTokenIndex === null) return;
+    const t = loc.tokens[state.menuTargetTokenIndex];
+    state.clipboard = [JSON.parse(JSON.stringify(t))];
+    state._pasteCount = 0; // reset cascade so next paste series starts at +30 again
+    const btn = document.getElementById('btn-copy-tokens');
+    if (btn) { btn.style.color = '#81c784'; setTimeout(() => { btn.style.color = ''; }, 800); }
+}
 
 // ============================================================
 //  STATUS EFFECTS
@@ -1702,14 +2142,14 @@ function renderInitiative() {
 
         li.innerHTML = `
             <div class="init-row-top">
-                <input class="init-val" type="number" value="${c.init}" min="-20" max="30" title="Инициатива">
-                <span class="init-name" title="${c.name}">${statusStr ? '<span class="init-statuses">' + statusStr + '</span> ' : ''}${c.name}</span>
+                <input class="init-val" type="number" value="${esc(c.init)}" min="-20" max="30" title="Инициатива">
+                <span class="init-name" title="${esc(c.name)}">${statusStr ? '<span class="init-statuses">' + esc(statusStr) + '</span> ' : ''}${esc(c.name)}</span>
                 <button class="init-del" title="Убрать из боя">×</button>
             </div>
             <div class="init-hp-row">
                 <button class="init-hp-btn minus" title="-1 HP">−</button>
                 <button class="init-hp-btn minus5" title="-5 HP">−5</button>
-                <input class="init-hp-input" type="text" value="${hpVal === '—' ? '' : hpVal}" placeholder="HP">
+                <input class="init-hp-input" type="text" value="${hpVal === '—' ? '' : esc(hpVal)}" placeholder="HP">
                 <button class="init-hp-btn plus5" title="+5 HP">+5</button>
                 <button class="init-hp-btn plus" title="+1 HP">+</button>
             </div>
@@ -1796,6 +2236,7 @@ const PING_COLORS = ['#ffd166', '#ff4a4a', '#29b6f6', '#81c784', '#ce93d8'];
 let _pingColorIdx = 0;
 
 function createPing(mx, my) {
+    if (bc && !isPlayer) bc.postMessage({ type: 'ping', x: mx, y: my });
     state.pings.push({
         x: mx, y: my,
         startTime: performance.now(),
@@ -1866,6 +2307,7 @@ function copySelectedTokens() {
     const selected = loc.tokens.filter(t => state.selectedTokenIds.has(t.id));
     if (!selected.length) return;
     state.clipboard = selected.map(t => JSON.parse(JSON.stringify(t)));
+    state._pasteCount = 0; // reset cascade so next paste series starts at +30 again
     // Visual feedback on button
     const btn = document.getElementById('btn-copy-tokens');
     btn.style.color = '#81c784';
@@ -1876,11 +2318,13 @@ function pasteTokens() {
     if (!state.clipboard.length) return;
     const loc = getCurrentLocation(); if (!loc) return;
     state.selectedTokenIds = new Set();
-    const OFFSET = 30; // pixels so pasted tokens don't land exactly on originals
+    const STEP = 30; // pixels offset per paste, cascades on repeated Ctrl+V
+    state._pasteCount = (state._pasteCount || 0) + 1;
+    const offset = STEP * state._pasteCount;
     state.clipboard.forEach(t => {
         const newToken = JSON.parse(JSON.stringify(t));
         newToken.id = Date.now() + Math.random();
-        newToken.x += OFFSET; newToken.y += OFFSET;
+        newToken.x += offset; newToken.y += offset;
         loc.tokens.push(newToken);
         state.selectedTokenIds.add(newToken.id);
     });
@@ -1890,30 +2334,80 @@ function pasteTokens() {
 function deleteSelectedTokens() {
     const loc = getCurrentLocation(); if (!loc) return;
     if (!state.selectedTokenIds.size) return;
-    loc.tokens = loc.tokens.filter(t => !state.selectedTokenIds.has(t.id));
+    const idsToDelete = new Set([...state.selectedTokenIds].map(String));
+    loc.tokens = loc.tokens.filter(t => !idsToDelete.has(String(t.id)));
+    // Also clean up any matching entries in the initiative tracker
+    state.initiative.combatants = state.initiative.combatants.filter(c => !idsToDelete.has(String(c.tokenRef)));
+    if (state.initiative.currentIndex >= state.initiative.combatants.length) {
+        state.initiative.currentIndex = state.initiative.combatants.length - 1;
+    }
     state.selectedTokenIds = new Set();
+    renderInitiative();
     pushHistory(); emit('canvas:redraw');
 }
 
 document.getElementById('btn-copy-tokens').addEventListener('click', copySelectedTokens);
 document.getElementById('btn-paste-tokens').addEventListener('click', pasteTokens);
 
-// Extend keydown with Ctrl+C, Ctrl+V, Del for selection
-// Ctrl+C, Ctrl+V, Del keyboard shortcuts for selection
+// Keyboard shortcuts: Del, Ctrl+C/V/Z/Y, and mode hotkeys V/H/F/R/D
 document.addEventListener('keydown', (e) => {
-    // Del — delete selected tokens
-    if (e.key === 'Delete' && state.selectedTokenIds.size > 0) {
+    const tag = document.activeElement.tagName;
+    const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+    if (e.key === 'Delete' && state.selectedTokenIds.size > 0 && !isInput) {
         deleteSelectedTokens(); return;
     }
-    // Ctrl+C — copy
-    if ((e.ctrlKey || e.metaKey) && e.key === 'c' && state.currentMode === 'select') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c' && state.currentMode === 'select' && !isInput) {
         e.preventDefault(); copySelectedTokens(); return;
     }
-    // Ctrl+V — paste
-    if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !isInput) {
         e.preventDefault(); pasteTokens(); return;
     }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z' && !isInput) {
+        e.preventDefault(); undo(); return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z')) && !isInput) {
+        e.preventDefault(); redo(); return;
+    }
+    if (isInput) return; // don't intercept mode hotkeys while typing
+
+    if (e.key === 'v' || e.key === 'V') { activateMode('select'); return; }
+    if (e.key === 'h' || e.key === 'H') { activateMode('move'); return; }
+    if (e.key === 'f' || e.key === 'F') { activateMode('fog'); return; }
+    if (e.key === 'r' || e.key === 'R') { activateMode('ruler'); return; }
+    if (e.key === 'd' || e.key === 'D') { activateMode('draw'); return; }
+    if (e.key === 't' || e.key === 'T') { activateMode('template'); return; }
 });
+
+// Space-hold = temporary pan tool (Hand tool)
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !state._spaceDown && !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement.tagName)) {
+        state._spaceDown = true;
+        state._prevMode = state.currentMode;
+        activateMode('move');
+        canvas.style.cursor = 'grab';
+        e.preventDefault();
+    }
+});
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space' && state._spaceDown) {
+        state._spaceDown = false;
+        if (state._prevMode) activateMode(state._prevMode);
+        canvas.style.cursor = 'default';
+    }
+});
+
+function activateMode(mode) {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`[data-mode="${mode}"]`);
+    if (btn) btn.classList.add('active');
+    setCurrentMode(mode);
+    document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
+    document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
+    document.getElementById('tpl-menu-popup').classList.toggle('show', mode === 'template');
+    if (mode !== 'ruler') { state.rulerStartPoint = null; state.rulerEndPoint = null; }
+    drawCanvas();
+}
 
 // ============================================================
 //  SELECTION OVERLAY
@@ -1936,12 +2430,55 @@ function drawSelectionOverlay(z, ox, oy) {
 }
 
 // ============================================================
+//  DICE ROLLER — formula parser (2d6+3, 4d6kh3, d20...)
+// ============================================================
+function rollDie(sides) { return Math.floor(Math.random() * sides) + 1; }
+
+function parseDiceFormula(formula) {
+    formula = formula.trim().toLowerCase().replace(/\s+/g, '');
+    if (!formula) return null;
+    let total = 0;
+    const parts = [];
+    const tokens = formula.match(/[+\-]?[^+\-]+/g) || [];
+
+    for (const token of tokens) {
+        const sign = token[0] === '-' ? -1 : 1;
+        const t = token.replace(/^[+\-]/, '');
+        const diceMatch = t.match(/^(\d*)d(\d+)(?:(kh|kl)(\d+))?$/);
+        if (diceMatch) {
+            const count = parseInt(diceMatch[1] || '1');
+            const sides = parseInt(diceMatch[2]);
+            const keepType = diceMatch[3];
+            const keepN   = diceMatch[4] ? parseInt(diceMatch[4]) : count;
+            const rolls = [];
+            for (let i = 0; i < count; i++) rolls.push(rollDie(sides));
+            let kept = [...rolls];
+            if (keepType === 'kh') kept = [...rolls].sort((a,b)=>b-a).slice(0, keepN);
+            if (keepType === 'kl') kept = [...rolls].sort((a,b)=>a-b).slice(0, keepN);
+            const subtotal = kept.reduce((s,v) => s+v, 0);
+            total += sign * subtotal;
+            const dropInfo = keepType ? ` keep ${keepType==='kh'?'▲':'▼'}${keepN}` : '';
+            parts.push(`${sign<0?'-':''}${count}d${sides}${dropInfo}:[${rolls.map(v => {
+                const isKept = keepType ? kept.includes(v) : true;
+                return isKept ? v : `(${v})`;
+            }).join(',')}]=${sign*subtotal}`);
+        } else {
+            const n = parseInt(t);
+            if (!isNaN(n)) { total += sign * n; parts.push(`${sign<0?'-':'+'}${n}`); }
+            else return null;
+        }
+    }
+    return { total, detail: parts.join(' ') };
+}
+
 function initDiceRoller() {
     const container = document.getElementById('dice-buttons');
     const result    = document.getElementById('dice-result');
+    const detail    = document.getElementById('dice-detail');
     const history   = document.getElementById('dice-history');
     const toggleBtn = document.getElementById('dice-toggle-btn');
     const popup     = document.getElementById('dice-popup');
+    const formulaIn = document.getElementById('dice-formula');
 
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1950,34 +2487,326 @@ function initDiceRoller() {
         toggleBtn.classList.toggle('active', !isOpen);
     });
 
+    const rollFormula = (formula) => {
+        const res = parseDiceFormula(formula);
+        if (!res) { result.innerText = '⚠️ Ошибка'; detail.innerText = 'Неверная формула'; return; }
+        result.innerText = `🎲 ${res.total}`;
+        detail.innerText = res.detail;
+        toggleBtn.innerText = `🎲 ${formula}: ${res.total}`;
+        const li = document.createElement('li');
+        li.innerText = `${formula} → ${res.total}`;
+        history.prepend(li);
+        while (history.children.length > 8) history.removeChild(history.lastChild);
+    };
+
+    document.getElementById('dice-roll-formula').addEventListener('click', (e) => {
+        e.stopPropagation(); rollFormula(formulaIn.value || 'd20');
+    });
+    formulaIn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.stopPropagation(); rollFormula(formulaIn.value || 'd20'); }
+    });
+    formulaIn.addEventListener('click', (e) => e.stopPropagation());
+
     [4, 6, 8, 10, 12, 20, 100].forEach(die => {
         const btn = document.createElement('button');
         btn.className = 'system-btn'; btn.innerText = `d${die}`;
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const r = Math.floor(Math.random() * die) + 1;
-            result.innerText = `\uD83C\uDFB2 ${r}`;
-            toggleBtn.innerText = `\uD83C\uDFB2 d${die}: ${r}`;
-            const li = document.createElement('li');
-            li.innerText = `d${die} \u2192 ${r}`;
-            history.prepend(li);
-            while (history.children.length > 8) history.removeChild(history.lastChild);
+            formulaIn.value = `d${die}`;
+            rollFormula(`d${die}`);
         });
         container.appendChild(btn);
     });
 }
 
 // ============================================================
-//  INIT
+//  TOKEN PROPERTIES PANEL
+// ============================================================
+const STATUS_LIST = ['🔥','🤢','🕶️','🧎','❄️','😴','🛡️','⚡'];
+let _propsTargetId = null;
+
+function initPropsPanel() {
+    const grid = document.getElementById('props-status-grid');
+    STATUS_LIST.forEach(icon => {
+        const btn = document.createElement('button');
+        btn.className = 'props-status-btn'; btn.textContent = icon; btn.dataset.icon = icon;
+        btn.addEventListener('click', () => {
+            const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+            const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+            if (!t.statuses) t.statuses = [];
+            const idx = t.statuses.indexOf(icon);
+            if (idx >= 0) t.statuses.splice(idx, 1); else t.statuses.push(icon);
+            refreshPropsPanel(); renderInitiative(); pushHistory(); emit('canvas:redraw');
+        });
+        grid.appendChild(btn);
+    });
+
+    document.querySelectorAll('.props-size-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+            const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+            t.radius = 25 * parseFloat(btn.dataset.mul);
+            refreshPropsPanel(); pushHistory(); emit('canvas:redraw');
+        });
+    });
+
+    document.getElementById('prop-rot-left').addEventListener('click', () => rotatePropsToken(-90));
+    document.getElementById('prop-rot-right').addEventListener('click', () => rotatePropsToken(90));
+    document.getElementById('prop-rot-reset').addEventListener('click', () => rotatePropsToken(null));
+
+    let _nameTimer, _hpTimer, _maxHpTimer;
+    document.getElementById('prop-name').addEventListener('input', () => {
+        clearTimeout(_nameTimer); _nameTimer = setTimeout(() => {
+            const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+            const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+            t.name = document.getElementById('prop-name').value;
+            renderInitiative(); emit('canvas:redraw');
+        }, 300);
+    });
+    document.getElementById('prop-hp').addEventListener('input', () => {
+        clearTimeout(_hpTimer); _hpTimer = setTimeout(() => {
+            const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+            const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+            t.hp = parseInt(document.getElementById('prop-hp').value) || 0;
+            const comb = state.initiative.combatants.find(c => c.tokenRef === t.id);
+            if (comb) comb.hp = t.hp;
+            renderInitiative(); emit('canvas:redraw');
+        }, 300);
+    });
+    document.getElementById('prop-maxhp').addEventListener('input', () => {
+        clearTimeout(_maxHpTimer); _maxHpTimer = setTimeout(() => {
+            const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+            const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+            t.maxHp = parseInt(document.getElementById('prop-maxhp').value) || undefined;
+            emit('canvas:redraw');
+        }, 300);
+    });
+
+    // Double-click on a token (in move or select mode) opens the props panel
+    canvas.addEventListener('dblclick', (e) => {
+        if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length >= 3) {
+            e.preventDefault(); const loc = getCurrentLocation(); if (loc) commitPolygonFog(loc);
+            return;
+        }
+        if (state.currentMode === 'move' || state.currentMode === 'select') {
+            const rect = canvas.getBoundingClientRect();
+            const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+            const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+            const loc = getCurrentLocation(); if (!loc) return;
+            for (let i = loc.tokens.length - 1; i >= 0; i--) {
+                const t = loc.tokens[i];
+                if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
+                    openPropsForToken(t.id); return;
+                }
+            }
+        }
+    });
+}
+
+function rotatePropsToken(angle) {
+    const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+    const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+    if (angle === null) t.rotation = 0;
+    else t.rotation = ((t.rotation || 0) + angle + 360) % 360;
+    pushHistory(); emit('canvas:redraw');
+}
+
+function openPropsForToken(tokenId) {
+    _propsTargetId = tokenId;
+    document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-tab="props"]').classList.add('active');
+    document.getElementById('tab-props').classList.add('active');
+    refreshPropsPanel();
+}
+
+function refreshPropsPanel() {
+    const loc = getCurrentLocation();
+    const t = loc ? loc.tokens.find(t => t.id === _propsTargetId) : null;
+    const empty = document.getElementById('props-empty');
+    const panel = document.getElementById('props-panel');
+    if (!t) { empty.style.display = ''; panel.style.display = 'none'; return; }
+    empty.style.display = 'none'; panel.style.display = '';
+
+    document.getElementById('prop-name').value = t.name || '';
+    document.getElementById('prop-hp').value = t.hp !== undefined && t.hp !== '' ? t.hp : '';
+    document.getElementById('prop-maxhp').value = t.maxHp || '';
+
+    const mul = (t.radius || 25) / 25;
+    document.querySelectorAll('.props-size-btn').forEach(b => {
+        b.classList.toggle('active', parseFloat(b.dataset.mul) === mul);
+    });
+    document.querySelectorAll('.props-status-btn').forEach(b => {
+        b.classList.toggle('active', t.statuses && t.statuses.includes(b.dataset.icon));
+    });
+}
+
+// Map upload by button (drag & drop isn't available on tablets)
+document.getElementById('load-map-btn').addEventListener('click', () => document.getElementById('load-map-file').click());
+document.getElementById('load-map-file').addEventListener('change', (e) => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (file) compressImageFile(file, 1600, (data) => setCurrentBackground(data));
+});
+
+// ============================================================
+//  AoE TEMPLATES UI
+// ============================================================
+document.querySelectorAll('#tpl-shapes .fog-mode-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('#tpl-shapes .fog-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.tplShape = btn.dataset.tplshape; drawCanvas();
+    });
+});
+document.getElementById('tpl-size').addEventListener('input', (e) => {
+    const v = parseInt(e.target.value);
+    if (v > 0) { state.tplSize = v; drawCanvas(); }
+});
+document.getElementById('tpl-clear-btn').addEventListener('click', (e) => {
+    e.stopPropagation(); state.tplStart = state.tplEnd = null; drawCanvas();
+});
+
+// ============================================================
+//  GM NOTES / CELL SIZE / ROLL INITIATIVE
+// ============================================================
+function syncNotesUI() { document.getElementById('notes-input').value = state.adventureData.notes || ''; }
+document.getElementById('notes-input').addEventListener('input', (e) => {
+    state.adventureData.notes = e.target.value; markDirty();
+});
+document.getElementById('cell-size-input').addEventListener('change', (e) => {
+    const v = parseInt(e.target.value);
+    if (!(v >= 20 && v <= 300)) { e.target.value = state.cellSize; return; }
+    state.cellSize = v; syncCurrentLocationState(); markDirty(); drawCanvas();
+});
+document.getElementById('init-roll-btn').addEventListener('click', () => {
+    if (!state.initiative.combatants.length) return;
+    state.initiative.combatants.forEach(c => { c.init = rollDie(20); });
+    state.initiative.combatants.sort((a, b) => b.init - a.init);
+    state.initiative.currentIndex = 0; state.initiative.round = 1;
+    renderInitiative(); emit('canvas:redraw');
+});
+
+// ============================================================
+//  PLAYER WINDOW — a second window that mirrors the map via BroadcastChannel (no server needed).
+//  Hidden fog zones, HP, rulers and panels are not shown; the map is auto-fitted to the window.
+// ============================================================
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('dms_tactical_board') : null;
+const _sentSrc = new Map();
+let _sentBg = '', _lastSig = '', _bcTimer = null;
+
+function scheduleBroadcast() {
+    if (isPlayer || !bc || _bcTimer) return;
+    _bcTimer = setTimeout(() => { _bcTimer = null; broadcastState(); }, 60);
+}
+function broadcastState() {
+    const loc = getCurrentLocation(); if (!loc) return;
+    const bgSig = loc.bgData ? `${loc.id}:${loc.bgData.length}` : '';
+    const tokens = loc.tokens.map(t => {
+        const sig = `${(t.src || '').length}`;
+        const known = _sentSrc.get(String(t.id)) === sig;
+        if (!known) _sentSrc.set(String(t.id), sig);
+        return { ...t, src: known ? undefined : t.src };
+    });
+    const msg = {
+        type: 'state', locId: loc.id, locName: loc.name, bgSig, tokens,
+        drawings: loc.drawings, fog: (loc.fog || []).filter(a => !a.hidden),
+        grid: { on: state.isGridEnabled, opacity: state.gridOpacity, color: state.gridColor, cell: state.cellSize },
+        init: { ids: state.initiative.combatants.map(c => c.tokenRef), idx: state.initiative.currentIndex },
+    };
+    const sig = JSON.stringify(msg);
+    if (sig === _lastSig) return;
+    _lastSig = sig;
+    if (bgSig !== _sentBg) { msg.bgData = loc.bgData; _sentBg = bgSig; }
+    try { bc.postMessage(msg); } catch (e) { console.warn('Broadcast failed:', e); }
+}
+
+if (bc && !isPlayer) {
+    bc.onmessage = (ev) => { if (ev.data && ev.data.type === 'hello') { _sentSrc.clear(); _sentBg = ''; _lastSig = ''; broadcastState(); } };
+}
+document.getElementById('open-player-btn').addEventListener('click', () => {
+    if (!bc) { alert('Ваш браузер не поддерживает BroadcastChannel.'); return; }
+    const url = location.href.split('#')[0].replace(/[?].*$/, '') + '?player=1';
+    const w = window.open(url, 'dms_player_window', 'width=1280,height=720');
+    if (!w) alert('Браузер заблокировал всплывающее окно. Разреши pop-up для этой страницы.');
+});
+
+if (isPlayer) {
+    document.body.classList.add('player-view');
+    document.title = "DM's Tactical Board — окно игроков";
+    const playerSrc = new Map();
+    let playerBg = null, playerBgSig = '';
+    bc.onmessage = (ev) => {
+        const m = ev.data; if (!m) return;
+        if (m.type === 'ping') { createPing(m.x, m.y); return; }
+        if (m.type !== 'state') return;
+        if (m.bgData !== undefined || m.bgSig !== playerBgSig) {
+            if (m.bgData !== undefined) playerBg = m.bgData;
+            if (!m.bgSig) playerBg = null;
+            playerBgSig = m.bgSig; state.imageCache.delete(`bg_${m.locId}`);
+        }
+        const tokens = m.tokens.map(t => {
+            if (t.src !== undefined) playerSrc.set(String(t.id), t.src);
+            return { ...t, src: t.src !== undefined ? t.src : playerSrc.get(String(t.id)) };
+        });
+        state.adventureData = { locations: [{ id: m.locId, name: m.locName, bgData: playerBg, tokens, drawings: m.drawings, fog: m.fog }], currentLocationId: m.locId, library: [] };
+        state.isGridEnabled = m.grid.on; state.gridOpacity = m.grid.opacity; state.gridColor = m.grid.color; state.cellSize = m.grid.cell;
+        state.initiative = { combatants: m.init.ids.map(id => ({ tokenRef: id })), currentIndex: m.init.idx, round: 1 };
+        drawCanvas();
+    };
+    bc.postMessage({ type: 'hello' });
+}
+
+// ============================================================
+//  INIT — file always opens blank. localStorage is only a recovery
+//  safety-net, restored ONLY if the user explicitly clicks "Восстановить".
 // ============================================================
 initColorGrids();
 initDiceRoller();
+initPropsPanel();
 renderLocations();
 renderLibrary();
 renderInitiative();
 resizeCanvas();
 pushHistory();
+_dirty = false; clearTimeout(_saveTimer);   // opening the page is not a change — don't overwrite the saved session
 updateUndoRedoButtons();
+
+// Offer recovery of the previous session. The old autosave is first copied to a separate "recovery" slot so
+// the new session's autosaves can't overwrite it before the user decides.
+(async function offerRecoveryIfAvailable() {
+    if (isPlayer) return;
+    try {
+        const prev = await idbGet(AUTOSAVE_KEY);
+        if (prev) {
+            let hasContent = false;
+            try { hasContent = adventureHasContent(JSON.parse(prev)); } catch { /* corrupt snapshot — ignore */ }
+            const existingRecovery = await idbGet(RECOVERY_KEY);
+            if (hasContent || !existingRecovery) await idbPut(RECOVERY_KEY, prev);
+        }
+        const raw = await idbGet(RECOVERY_KEY);
+        if (!raw) return;
+        let parsed; try { parsed = JSON.parse(raw); } catch { return; }
+        if (!adventureHasContent(parsed)) return;
+        const btn = document.getElementById('load-adventure-btn');
+        const recoverBtn = document.createElement('button');
+        recoverBtn.className = 'system-btn';
+        recoverBtn.id = 'recover-autosave-btn';
+        recoverBtn.title = 'Восстановить несохранённые данные из прошлой сессии';
+        recoverBtn.textContent = '♻️ Восстановить';
+        recoverBtn.style.background = '#3a2a1a';
+        recoverBtn.style.borderColor = '#cc8800';
+        recoverBtn.addEventListener('click', () => {
+            if (!confirm('Восстановить карту/токены из последней автосохранённой сессии? Текущее состояние будет заменено.')) return;
+            try { applyAdventure(parsed); markDirty(); recoverBtn.remove(); }
+            catch (err) { alert('Не удалось восстановить данные: ' + err.message); }
+        });
+        btn.insertAdjacentElement('afterend', recoverBtn);
+    } catch (e) {
+        console.warn('Recovery unavailable:', e);
+        setSaveStatus('⚠ Автосохранение недоступно в этом браузере — сохраняйте в файл', true);
+    }
+})();
 </script>
 </body>
 </html>
