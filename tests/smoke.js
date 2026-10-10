@@ -203,6 +203,32 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   }, PNG);
   assert.deepStrictEqual(menu, { head: 'Гоблин❤️ 3/7  ·  🛡 КД 15', names: ['Гоблин 2', 'Гоблин 3'], hp: 7, back: true });
 
+  // Layers: objects draw under creatures, can't be grabbed while locked, and skip initiative import
+  const lay = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 97, src: png, x: 700, y: 500, radius: 25, name: 'Сундук', rotation: 0 },
+                  { id: 98, src: png, x: 700, y: 500, radius: 25, name: 'Вор', rotation: 0 });
+    // the chest is last in the array, but on the object layer it goes under the thief
+    l.tokens.push(l.tokens.splice(l.tokens.findIndex(t => t.id === 97), 1)[0]);
+    openPropsForToken(97);
+    document.querySelector('#prop-layer [data-layer="object"]').click();
+    const ord = layerOrder(l.tokens), order = [ord[0].name, ord[ord.length - 1].name];
+    const sx = 700 * state.zoomLevel + state.offsetX, sy = 500 * state.zoomLevel + state.offsetY;
+    const top = l.tokens[tokenIndexAt(l, sx, sy, true)].name;
+    l.tokens = l.tokens.filter(t => t.id !== 98);
+    const lockedMiss = tokenIndexAt(l, sx, sy, true);
+    document.getElementById('btn-lock-objects').click();
+    const unlockedHit = l.tokens[tokenIndexAt(l, sx, sy, true)].name;
+    document.getElementById('btn-lock-objects').click();
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    document.getElementById('init-import-btn').click();
+    const inInit = state.initiative.combatants.some(c => c.tokenRef === 97);
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    l.tokens = l.tokens.filter(t => t.id !== 97);
+    return { order, top, lockedMiss, unlockedHit, inInit };
+  }, PNG);
+  assert.deepStrictEqual(lay, { order: ['Сундук', 'Вор'], top: 'Вор', lockedMiss: -1, unlockedHit: 'Сундук', inInit: false });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
