@@ -129,6 +129,28 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   assert.strictEqual(await page.evaluate(() => getCurrentLocation().walls.length), 2, 'wall not drawn by clicks');
   await page.keyboard.press('h');
 
+  // Group damage/healing: applies to all selected tokens, heal is capped, 0 HP = dead and skipped in initiative
+  const grp = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 81, src: png, x: 400, y: 100, radius: 25, name: 'Орк1', hp: 10, maxHp: 15, rotation: 0 },
+                  { id: 82, src: png, x: 450, y: 100, radius: 25, name: 'Орк2', hp: 4, maxHp: 15, rotation: 0 });
+    state.selectedTokenIds = new Set([81, 82]);
+    document.getElementById('btn-hp-group').click();
+    document.getElementById('hp-amount').value = '6';
+    document.getElementById('hp-dmg-btn').click();
+    const a = l.tokens.find(t => t.id === 81), b = l.tokens.find(t => t.id === 82);
+    const afterDmg = [a.hp, b.hp, isTokenDead(a), isTokenDead(b)];
+    state.selectedTokenIds = new Set([81]);
+    document.getElementById('hp-amount').value = '20';
+    document.getElementById('hp-heal-btn').click();
+    state.initiative = { combatants: [{ name: 'Орк1', init: 15, tokenRef: 81 }, { name: 'Орк2', init: 12, tokenRef: 82 }, { name: 'Маг', init: 5, tokenRef: 77 }], currentIndex: 0, round: 1 };
+    document.getElementById('init-next-btn').click();
+    const skipped = state.initiative.currentIndex;
+    state.selectedTokenIds = new Set(); state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    return { afterDmg, healed: a.hp, skipped };
+  }, PNG);
+  assert.deepStrictEqual(grp, { afterDmg: [4, 0, false, true], healed: 15, skipped: 2 });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
