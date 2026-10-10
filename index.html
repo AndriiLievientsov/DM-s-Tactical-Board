@@ -190,6 +190,14 @@
         #save-status.error { color: #ffb347; font-weight: bold; }
         #notes-input { width: 100%; height: calc(100vh - 190px); min-height: 160px; resize: vertical; background: #14141a; border: 1px solid var(--border-color); color: var(--text-color); padding: 8px; border-radius: 4px; font: 13px/1.5 'Segoe UI', sans-serif; outline: none; }
         #notes-input:focus { border-color: var(--accent-color); }
+        .sound-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+        .sound-row label { display: block; font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+        .sound-row select { width: 100%; background: #14141a; border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none; margin-bottom: 6px; }
+        .sound-controls { display: flex; gap: 6px; align-items: center; }
+        .sound-controls input[type=range] { flex: 1; }
+        #sound-play-btn { background: #1a3a1a; border: 1px solid #2e7d32; color: #81c784; border-radius: 4px; cursor: pointer; padding: 5px 10px; font-weight: bold; min-width: 44px; }
+        #sound-play-btn.playing { background: #3a1a1a; border-color: #c62828; color: #ff9090; }
+        #sound-file-name { font-size: 11px; color: #777; margin-top: 4px; word-break: break-all; }
         .cell-size-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color); }
         .cell-size-row label { display: block; font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
         .cell-size-row input, .tpl-row input { width: 100%; background: #14141a; border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none; }
@@ -414,6 +422,24 @@
                 <div class="cell-size-row">
                     <label for="cell-size-input">Размер клетки на карте (px)</label>
                     <input type="number" id="cell-size-input" min="20" max="300" step="1" value="50">
+                </div>
+                <div class="sound-row">
+                    <label for="sound-kind">🎵 Звук локации</label>
+                    <select id="sound-kind">
+                        <option value="">Тишина</option>
+                        <option value="rain">🌧 Дождь</option>
+                        <option value="wind">🌬 Ветер</option>
+                        <option value="fire">🔥 Костёр / камин</option>
+                        <option value="sea">🌊 Море</option>
+                        <option value="cave">💧 Подземелье</option>
+                        <option value="file">📁 Свой файл (музыка)…</option>
+                    </select>
+                    <input type="file" id="sound-file" accept="audio/*" style="display:none">
+                    <div class="sound-controls">
+                        <button id="sound-play-btn" title="Включить / выключить звук">▶ Играть</button>
+                        <input type="range" id="sound-volume" min="0" max="100" value="50" aria-label="Громкость">
+                    </div>
+                    <div id="sound-file-name"></div>
                 </div>
             </div>
             <div id="tab-notes" class="tab-content">
@@ -839,6 +865,7 @@ function setCurrentLocationId(id) {
     // History snapshots cover one location only — start a fresh one so Undo can't leak state across locations
     state.drawingHistory = []; state.drawingHistoryIndex = -1; pushHistory();
     emit('zoom:change', state.zoomLevel); emit('locations:update'); emit('canvas:redraw');
+    if (typeof Ambience !== 'undefined') Ambience.sync();
 }
 function addLocation(name) {
     const loc = { id: Date.now(), name, bgData: null, tokens: [], drawings: [], fog: [], walls: [], lighting: 'off', zoomLevel: 1.0, offsetX: 50, offsetY: 50, cellSize: 50 };
@@ -1110,6 +1137,143 @@ function compressImageFile(file, maxPx, callback, keepAlpha = false) {
 function compressTokenFile(file, callback) { compressImageFile(file, 512, callback, true); }
 
 // ============================================================
+//  AMBIENCE — per-location background sound. Built-in sounds are synthesised with Web Audio
+//  (no files, works offline); "file" plays the DM's own track stored with the location.
+//  Plays only in the DM window (the one connected to the speakers).
+// ============================================================
+const AMBIENCE_KINDS = ['rain', 'wind', 'fire', 'sea', 'cave', 'file'];
+const Ambience = (() => {
+    let ac = null, master = null, nodes = [], timers = [], audioEl = null, playing = false, currentKey = '';
+    const ctxReady = () => {
+        if (!ac) {
+            const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+            ac = new AC(); master = ac.createGain(); master.connect(ac.destination);
+        }
+        if (ac.state === 'suspended') ac.resume().catch(() => {});
+        return true;
+    };
+    // Looping noise buffer: white, pink or brown
+    const noise = (color) => {
+        const len = ac.sampleRate * 4, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, last = 0;
+        for (let i = 0; i < len; i++) {
+            const w = Math.random() * 2 - 1;
+            if (color === 'pink') { b0 = 0.99765 * b0 + w * 0.0990460; b1 = 0.96300 * b1 + w * 0.2965164; b2 = 0.57000 * b2 + w * 1.0526913; d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2; }
+            else if (color === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
+            else d[i] = w;
+        }
+        const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.start();
+        nodes.push(src); return src;
+    };
+    const filter = (type, freq, q) => { const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q; nodes.push(f); return f; };
+    const gain = (v) => { const g = ac.createGain(); g.gain.value = v; nodes.push(g); return g; };
+    const lfo = (rate, depth, target) => { const o = ac.createOscillator(); o.frequency.value = rate; const g = gain(depth); o.connect(g); g.connect(target); o.start(); nodes.push(o); };
+    const every = (minMs, maxMs, fn) => {
+        let t;
+        const tick = () => { fn(); t = setTimeout(tick, minMs + Math.random() * (maxMs - minMs)); timers.push(t); };
+        t = setTimeout(tick, minMs); timers.push(t);
+    };
+    const builders = {
+        rain() { const n = noise('pink'); const hp = filter('highpass', 500), lp = filter('lowpass', 7000), g = gain(0.55); n.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master); },
+        wind() {
+            const n = noise('brown'); const bp = filter('bandpass', 500, 0.8), g = gain(0.5);
+            n.connect(bp); bp.connect(g); g.connect(master); lfo(0.07, 300, bp.frequency); lfo(0.11, 0.25, g.gain);
+        },
+        sea() { const n = noise('brown'); const lp = filter('lowpass', 900), g = gain(0.5); n.connect(lp); lp.connect(g); g.connect(master); lfo(0.12, 0.4, g.gain); },
+        fire() {
+            const n = noise('brown'); const lp = filter('lowpass', 500), g = gain(0.6); n.connect(lp); lp.connect(g); g.connect(master);
+            const crackle = filter('highpass', 2500); crackle.connect(master);
+            every(40, 400, () => {   // short crackles
+                if (!ac) return;
+                const b = ac.createBuffer(1, ac.sampleRate * 0.02, ac.sampleRate), d = b.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+                const s = ac.createBufferSource(), sg = ac.createGain(); s.buffer = b; sg.gain.value = 0.15 + Math.random() * 0.5;
+                s.connect(sg); sg.connect(crackle); s.start();
+            });
+        },
+        cave() {
+            const n = noise('brown'); const lp = filter('lowpass', 180), g = gain(0.7); n.connect(lp); lp.connect(g); g.connect(master);
+            every(900, 3800, () => {   // water drips: short falling sine "plip"
+                if (!ac) return;
+                const o = ac.createOscillator(), og = ac.createGain(), t = ac.currentTime, f = 900 + Math.random() * 1400;
+                o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.45, t + 0.12);
+                og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.25, t + 0.005); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+                o.connect(og); og.connect(master); o.start(t); o.stop(t + 0.3);
+            });
+        },
+    };
+    const stopAll = () => {
+        timers.forEach(clearTimeout); timers = [];
+        nodes.forEach(n => { try { if (n.stop) n.stop(); n.disconnect(); } catch (e) {} }); nodes = [];
+        if (audioEl) { audioEl.pause(); audioEl.removeAttribute('src'); audioEl.load(); audioEl = null; }
+        currentKey = '';
+    };
+    const start = (loc) => {
+        const kind = loc && loc.sound, vol = loc ? loc.soundVolume ?? 0.5 : 0.5;
+        const key = kind ? `${loc.id}:${kind}:${kind === 'file' ? (loc.soundData || '').length : ''}` : '';
+        if (key === currentKey) { setVolume(vol); return; }
+        stopAll();
+        if (!kind) return;
+        if (kind === 'file') {
+            if (!loc.soundData) return;
+            audioEl = new Audio(loc.soundData); audioEl.loop = true; audioEl.volume = vol;
+            audioEl.play().catch(() => {});
+        } else {
+            if (!ctxReady()) return;
+            master.gain.value = vol;
+            builders[kind]();
+        }
+        currentKey = key;
+    };
+    const setVolume = (v) => { if (master) master.gain.value = v; if (audioEl) audioEl.volume = v; };
+    return {
+        get playing() { return playing; },
+        get activeKind() { return currentKey ? currentKey.split(':')[1] : ''; },
+        toggle() { playing = !playing; this.sync(); return playing; },
+        sync() {
+            if (isPlayer) return;
+            if (playing) start(getCurrentLocation()); else stopAll();
+            syncSoundUI();
+        },
+        setVolume,
+    };
+})();
+
+function syncSoundUI() {
+    const loc = getCurrentLocation(); if (!loc) return;
+    const kind = document.getElementById('sound-kind'); if (!kind) return;
+    kind.value = loc.sound || '';
+    document.getElementById('sound-volume').value = Math.round((loc.soundVolume ?? 0.5) * 100);
+    const btn = document.getElementById('sound-play-btn');
+    btn.textContent = Ambience.playing ? '■ Стоп' : '▶ Играть';
+    btn.classList.toggle('playing', Ambience.playing);
+    document.getElementById('sound-file-name').textContent = loc.sound === 'file' ? (loc.soundData ? `📁 ${loc.soundName || 'файл'}` : 'Файл не выбран') : '';
+}
+function initSoundUI() {
+    const kind = document.getElementById('sound-kind'), file = document.getElementById('sound-file');
+    kind.addEventListener('change', () => {
+        const loc = getCurrentLocation(); if (!loc) return;
+        if (kind.value === 'file' && !loc.soundData) { file.click(); }
+        loc.sound = kind.value; markDirty(); Ambience.sync();
+    });
+    file.addEventListener('change', () => {
+        const f = file.files[0]; file.value = '';
+        const loc = getCurrentLocation(); if (!f || !loc) { syncSoundUI(); return; }
+        if (f.size > 25 * 1024 * 1024) { alert('Файл больше 25 МБ — он слишком раздует сохранение приключения. Возьми трек покороче или в формате .ogg/.mp3.'); return; }
+        const r = new FileReader();
+        r.onload = () => { loc.soundData = r.result; loc.soundName = f.name; loc.sound = 'file'; markDirty(); Ambience.sync(); };
+        r.readAsDataURL(f);
+    });
+    document.getElementById('sound-file-name').addEventListener('click', () => { if ((getCurrentLocation() || {}).sound === 'file') file.click(); });
+    document.getElementById('sound-play-btn').addEventListener('click', () => Ambience.toggle());
+    document.getElementById('sound-volume').addEventListener('input', (e) => {
+        const loc = getCurrentLocation(); if (!loc) return;
+        loc.soundVolume = parseInt(e.target.value) / 100; Ambience.setVolume(loc.soundVolume); markDirty();
+    });
+    syncSoundUI();
+}
+
+// ============================================================
 //  ADVENTURE DATA — validation / normalisation (import + recovery)
 // ============================================================
 const ADVENTURE_VERSION = 3;
@@ -1144,6 +1308,10 @@ function normalizeAdventure(raw) {
             door: !!w.door, open: !!w.open,
         })),
         lighting: l.lighting === 'dark' ? 'dark' : 'off',
+        sound: AMBIENCE_KINDS.includes(l.sound) ? l.sound : '',
+        soundVolume: Math.max(0, Math.min(1, num(l.soundVolume, 0.5))),
+        soundData: typeof l.soundData === 'string' && l.soundData.startsWith('data:audio') ? l.soundData : null,
+        soundName: typeof l.soundName === 'string' ? l.soundName : '',
         vision: !!l.vision,
         zoomLevel: num(l.zoomLevel, 1.0), offsetX: num(l.offsetX, 50), offsetY: num(l.offsetY, 50),
         cellSize: num(l.cellSize, 50),
@@ -1172,6 +1340,7 @@ function applyAdventure(data) {
     state.initiative = { combatants: [], currentIndex: -1, round: 1 };
     state.selectedTokenIds = new Set();
     updateZoomUI(); renderLocations(); renderLibrary(); renderEncounters(); renderInitiative(); syncNotesUI();
+    if (typeof Ambience !== 'undefined') Ambience.sync();
     state.drawingHistory = []; state.drawingHistoryIndex = -1;
     pushHistory(); drawCanvas();
 }
@@ -3792,6 +3961,7 @@ initStatBlock();
 initHpPopup();
 initHelp();
 initEncounters();
+initSoundUI();
 renderLocations();
 renderLibrary();
 renderInitiative();

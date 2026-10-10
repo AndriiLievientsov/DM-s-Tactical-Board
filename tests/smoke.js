@@ -250,6 +250,28 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   }, PNG);
   assert.deepStrictEqual(enc, { saved: [2, 7, 100], names: ['Гоблин 2', 'Гоблин 3'], gap: 100, init: 2, listed: 1, kept: 1 });
 
+  // Ambience: each location keeps its own sound; switching locations switches the sound while playing
+  const snd = await page.evaluate(() => {
+    const home = getCurrentLocation().id;
+    addLocation('Пещера');
+    const ids = [home, state.adventureData.locations[state.adventureData.locations.length - 1].id];
+    setCurrentLocationId(ids[0]);
+    const k = document.getElementById('sound-kind'); k.value = 'rain'; k.dispatchEvent(new Event('change'));
+    setCurrentLocationId(ids[1]);
+    k.value = 'cave'; k.dispatchEvent(new Event('change'));
+    document.getElementById('sound-play-btn').click();
+    const a = Ambience.activeKind;
+    setCurrentLocationId(ids[0]);
+    const b = Ambience.activeKind;
+    document.getElementById('sound-play-btn').click();
+    const c = Ambience.activeKind;
+    const kept = normalizeAdventure(state.adventureData).locations.map(l => l.sound);
+    state.adventureData.locations.forEach(l => { l.sound = ''; });
+    state.adventureData.locations = state.adventureData.locations.filter(l => l.id !== ids[1]);
+    return { a, b, c, kept: kept.slice(0, 2), btn: document.getElementById('sound-play-btn').textContent };
+  });
+  assert.deepStrictEqual(snd, { a: 'cave', b: 'rain', c: '', kept: ['rain', 'cave'], btn: '▶ Играть' });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
