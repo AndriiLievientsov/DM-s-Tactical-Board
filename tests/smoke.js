@@ -151,6 +151,30 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   }, PNG);
   assert.deepStrictEqual(grp, { afterDmg: [4, 0, false, true], healed: 15, skipped: 2 });
 
+  // Movement: dragging shows distance; feet moved this turn add up and reset when the token's turn starts
+  const mv = await page.evaluate(() => {
+    state.isGridEnabled = true; state.gridType = 'square'; state.cellSize = 50;
+    const diag = moveDistanceFt({ x: 25, y: 25 }, { x: 125, y: 75 });   // 2 across, 1 down = 2 cells
+    return { diag };
+  });
+  assert.deepStrictEqual(mv, { diag: 10 });
+  await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 91, src: png, x: 50, y: 50, radius: 25, name: 'Воин', rotation: 0, speed: 30 });
+    state.initiative = { combatants: [{ name: 'Воин', init: 10, tokenRef: 91 }], currentIndex: 0, round: 1 };
+  }, PNG);
+  await page.keyboard.press('h');
+  const toScreen = (x, y) => page.evaluate(([x, y]) => { const r = canvas.getBoundingClientRect(); return { x: r.left + x * state.zoomLevel + state.offsetX, y: r.top + y * state.zoomLevel + state.offsetY }; }, [x, y]);
+  const drag = async (x1, y1, x2, y2) => {
+    const a = await toScreen(x1, y1), b = await toScreen(x2, y2);
+    await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 4 }); await page.mouse.up();
+  };
+  await drag(50, 50, 200, 50);   // 3 cells
+  await drag(200, 50, 200, 150); // 2 cells
+  const used = await page.evaluate(() => { const u = state.moveUsed[91]; document.getElementById('init-next-btn').click(); return [u, state.moveUsed[91]]; });
+  assert.deepStrictEqual(used, [25, undefined]);
+  await page.evaluate(() => { state.initiative = { combatants: [], currentIndex: -1, round: 1 }; });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
