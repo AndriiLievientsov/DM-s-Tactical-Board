@@ -112,6 +112,18 @@
         #dice-toggle-btn.active { background: #7b2fff; color: white; border-color: #9b5fff; }
         #dice-popup { position: absolute; top: calc(100% + 8px); right: 0; background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; width: 220px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
         #dice-popup.show { display: block; }
+        #help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9000; display: none; align-items: center; justify-content: center; padding: 16px; }
+        #help-overlay.show { display: flex; }
+        #help-box { background: #202026; border: 1px solid var(--border-color); border-radius: 10px; width: min(720px, 100%); max-height: 90vh; overflow: auto; padding: 20px 24px; box-shadow: 0 16px 48px rgba(0,0,0,0.7); color: #ddd; font-size: 13px; line-height: 1.5; }
+        #help-box h2 { font-size: 18px; color: #fff; margin-bottom: 4px; }
+        #help-box h3 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 6px; }
+        #help-box ol { padding-left: 20px; } #help-box li { margin-bottom: 4px; }
+        #help-keys { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }
+        #help-keys kbd { background: #2a2a33; border: 1px solid #44444f; border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; font-family: inherit; font-size: 12px; color: #fff; white-space: nowrap; }
+        #help-box .help-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; gap: 10px; flex-wrap: wrap; }
+        #help-box .help-foot label { color: #888; font-size: 12px; display: flex; gap: 6px; align-items: center; }
+        #help-close { background: #ff4a4a; border: none; color: #fff; padding: 7px 18px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        body.player-view #help-overlay { display: none !important; }
         #hp-popup { position: absolute; top: calc(100% + 8px); left: 0; background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; width: 230px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
         #hp-popup.show { display: block; }
         #hp-popup input { width: 100%; background: #14141a; border: 1px solid #383842; color: #e3e3e6; padding: 6px 8px; border-radius: 4px; font-size: 16px; text-align: center; outline: none; margin-bottom: 8px; }
@@ -344,6 +356,7 @@
         </div>
 
         <div class="right-block">
+            <button class="system-btn" id="help-btn" title="Справка и горячие клавиши (?)" style="margin-right:8px;">❓</button>
             <button class="system-btn" id="open-player-btn" title="Открыть окно для игроков (без тумана-превью и панелей) — перетащи на проектор" style="margin-right:8px;">🖥️ Игрокам</button>
             <div class="dice-container">
                 <button id="dice-toggle-btn">🎲 Кубики</button>
@@ -480,6 +493,28 @@
         <main class="canvas-area" id="drop-zone">
             <canvas id="game-canvas"></canvas>
         </main>
+    </div>
+
+    <!-- Help / first-run guide -->
+    <div id="help-overlay" role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <div id="help-box">
+            <h2 id="help-title">🎲 DM's Tactical Board</h2>
+            <div style="color:#888">Стол мастера для игры вживую: ты управляешь, игроки смотрят на второй экран.</div>
+            <h3>С чего начать</h3>
+            <ol>
+                <li><b>🖼️ Карта</b> — загрузи картинку карты (или перетащи файл на поле).</li>
+                <li>Положи токены: перетащи картинки на карту или добавь их в <b>Библиотеку</b>.</li>
+                <li><b>Двойной клик</b> по токену — его карточка: HP, КД, скорость, атаки, статусы. <b>Правый клик</b> — быстрое меню.</li>
+                <li>Вкладка <b>Инициатива</b> → «⬇️ Импорт токенов» → «🎲 Бросить всем» → «▶ Следующий ход».</li>
+                <li><b>🖥️ Игрокам</b> — открой окно для проектора/ТВ: там нет панелей, HP и скрытого тумана.</li>
+            </ol>
+            <h3>Горячие клавиши</h3>
+            <div id="help-keys"></div>
+            <div class="help-foot">
+                <label><input type="checkbox" id="help-dont-show"> Не показывать при запуске</label>
+                <button id="help-close">Понятно</button>
+            </div>
+        </div>
     </div>
 
     <!-- Context menus -->
@@ -2854,6 +2889,42 @@ function deleteSelectedTokens() {
 document.getElementById('btn-copy-tokens').addEventListener('click', copySelectedTokens);
 document.getElementById('btn-paste-tokens').addEventListener('click', pasteTokens);
 
+// ============================================================
+//  HELP — "?" overlay with a short guide and every hotkey; shown once on first launch
+// ============================================================
+const HELP_KEYS = [
+    ['V', 'Выделение рамкой'], ['H', 'Перемещение'], ['F', 'Туман войны'], ['R', 'Линейка'],
+    ['D', 'Рисование'], ['T', 'Шаблоны заклинаний'], ['W', 'Стены и двери'],
+    ['Пробел (удержание)', 'Временное панорамирование'], ['Колесо мыши', 'Масштаб к курсору'],
+    ['Shift + клик', 'Пинг (на тачскрине — долгое нажатие)'], ['Двойной клик по токену', 'Карточка токена'],
+    ['Ctrl + Z / Ctrl + Y', 'Отмена / повтор'], ['Ctrl + C / Ctrl + V', 'Копировать / вставить токены'],
+    ['Delete', 'Удалить выделенные токены'], ['Esc', 'Сбросить инструмент или закрыть окно'], ['?', 'Эта справка'],
+];
+const HELP_SEEN_KEY = 'dms_help_seen';
+function openHelp() { document.getElementById('help-overlay').classList.add('show'); document.getElementById('help-close').focus(); }
+function closeHelp() {
+    document.getElementById('help-overlay').classList.remove('show');
+    try { localStorage.setItem(HELP_SEEN_KEY, document.getElementById('help-dont-show').checked ? '1' : '0'); } catch (e) {}
+}
+function initHelp() {
+    const keys = document.getElementById('help-keys');
+    HELP_KEYS.forEach(([k, what]) => {
+        const kbd = document.createElement('kbd'); kbd.textContent = k;
+        const span = document.createElement('span'); span.textContent = what;
+        const cell = document.createElement('div'); cell.appendChild(kbd);
+        keys.append(cell, span);
+    });
+    document.getElementById('help-btn').addEventListener('click', (e) => { e.stopPropagation(); openHelp(); });
+    document.getElementById('help-close').addEventListener('click', closeHelp);
+    const overlay = document.getElementById('help-overlay');
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeHelp(); });
+    overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeHelp(); } });
+    let seen = null;
+    try { seen = localStorage.getItem(HELP_SEEN_KEY); } catch (e) {}
+    document.getElementById('help-dont-show').checked = seen !== '0';
+    if (!isPlayer && seen !== '1') openHelp();   // first launch, or the user kept "show on start"
+}
+
 // Keyboard shortcuts: Del, Ctrl+C/V/Z/Y, and mode hotkeys V/H/F/R/D
 document.addEventListener('keydown', (e) => {
     const tag = document.activeElement.tagName;
@@ -2875,6 +2946,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault(); redo(); return;
     }
     if (isInput) return; // don't intercept mode hotkeys while typing
+    if (e.key === '?') { openHelp(); return; }
 
     if (e.key === 'v' || e.key === 'V') { activateMode('select'); return; }
     if (e.key === 'h' || e.key === 'H') { activateMode('move'); return; }
@@ -3432,6 +3504,7 @@ initDiceRoller();
 initPropsPanel();
 initStatBlock();
 initHpPopup();
+initHelp();
 renderLocations();
 renderLibrary();
 renderInitiative();
