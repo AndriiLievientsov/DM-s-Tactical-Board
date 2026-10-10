@@ -28,6 +28,7 @@
 
         .controls-group { display: flex; align-items: center; background: #111116; padding: 4px; border-radius: 6px; gap: 5px; }
         .zoom-btn { background: #32323d; border: none; color: white; width: 28px; height: 28px; cursor: pointer; font-weight: bold; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .zoom-btn.active { background: #4a3a1a; color: #ffd166; }
         .zoom-btn:hover { background: #41414f; }
         .zoom-val { min-width: 46px; text-align: center; font-size: 12px; font-weight: bold; color: #aaa; }
 
@@ -266,6 +267,7 @@
                         </div>
                     </div>
                 </div>
+                <button class="zoom-btn" id="btn-lock-objects" style="width:auto; padding:0 8px; font-size:12px;">🔒 Объекты</button>
             </div>
 
             <div class="mode-container">
@@ -430,6 +432,13 @@
                     </div>
                     <div class="props-field">
                         <label for="prop-hidden" style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer;"><input id="prop-hidden" type="checkbox"> 🙈 Скрыт от игроков</label>
+                    </div>
+                    <div class="props-field">
+                        <label>Слой</label>
+                        <div class="props-size-btns" id="prop-layer">
+                            <button class="props-size-btn props-layer-btn" data-layer="token" title="Существа: двигаются, участвуют в инициативе">🧍 Существа</button>
+                            <button class="props-size-btn props-layer-btn" data-layer="object" title="Объекты: сундуки, деревья, мебель — лежат под существами и закрепляются кнопкой 🔒">📦 Объекты</button>
+                        </div>
                     </div>
                     <div class="props-row">
                         <div class="props-field">
@@ -703,6 +712,7 @@ const state = {
     ],
     imageCache: new Map(),
     isDraggingToken: false,
+    objectsLocked: true,            // object-layer tokens (furniture, doors, chests) can't be grabbed while locked
     dragOrigin: null,               // where the dragged token started (movement distance)
     moveUsed: {},                   // feet moved this turn, per token id (reset when its turn starts)
     isPanningMap: false,
@@ -1231,7 +1241,7 @@ async function drawCanvas() {
     const drawLayers = async (mw, mh) => {
         if (state.isGridEnabled) drawTacticalGrid(mw, mh, z, ox, oy);
         drawVectorDrawings(loc.drawings, z, ox, oy);
-        await drawTokens(loc.tokens, z, ox, oy);
+        await drawTokens(layerOrder(loc.tokens), z, ox, oy);
         drawInitiativeHighlight(loc.tokens, z, ox, oy);
         drawLighting(loc, z, ox, oy);
         drawWalls(loc, z, ox, oy);
@@ -1959,13 +1969,12 @@ canvas.addEventListener('pointerdown', (e) => {
             state.tplDragging = true; drawCanvas(); return;
         }
         if (state.currentMode === 'move') {
-            for (let i = loc.tokens.length - 1; i >= 0; i--) {
+            const i = tokenIndexAt(loc, cx, cy, true);
+            if (i >= 0) {
                 const t = loc.tokens[i];
-                if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
-                    state.isDraggingToken = true; state.draggedTokenIndex = i;
-                    state.dragOrigin = { x: t.x, y: t.y, id: t.id };
-                    canvas.style.cursor = 'move'; return;
-                }
+                state.isDraggingToken = true; state.draggedTokenIndex = i;
+                state.dragOrigin = { x: t.x, y: t.y, id: t.id };
+                canvas.style.cursor = 'move'; return;
             }
             state.isPanningMap = true; state.startX = e.clientX - ox; state.startY = e.clientY - oy;
             canvas.style.cursor = 'grabbing';
@@ -2040,7 +2049,7 @@ function onPointerRelease(e) {
         const loc = getCurrentLocation();
         if (loc) {
             loc.tokens.forEach(t => {
-                if (t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY)
+                if (!isLockedObject(t) && t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY)
                     state.selectedTokenIds.add(t.id);
             });
         }
@@ -2111,14 +2120,12 @@ canvas.addEventListener('contextmenu', (e) => {
     const loc = getCurrentLocation(); if (!loc) return;
 
     hideAllContextMenus();
-    for (let i = loc.tokens.length - 1; i >= 0; i--) {
-        const t = loc.tokens[i];
-        if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
-            state.menuTargetTokenIndex = i;
-            fillTokenMenuHead(t);
-            showMenuAt(document.getElementById('token-menu'), e.clientX, e.clientY);
-            return;
-        }
+    const hit = tokenIndexAt(loc, cx, cy, false);
+    if (hit >= 0) {
+        state.menuTargetTokenIndex = hit;
+        fillTokenMenuHead(loc.tokens[hit]);
+        showMenuAt(document.getElementById('token-menu'), e.clientX, e.clientY);
+        return;
     }
     if (wallsVisible(loc)) {
         const walls = loc.walls || [];
@@ -2605,6 +2612,36 @@ function quickChangeHP(delta) {
     renderInitiative(); pushHistory(); emit('canvas:redraw');
 }
 // ============================================================
+//  LAYERS — "object" tokens (chests, trees, furniture) sit under creatures and can be locked
+// ============================================================
+function isObjectToken(t) { return t.layer === 'object'; }
+function isLockedObject(t) { return isObjectToken(t) && state.objectsLocked; }
+// Draw order: objects first, then creatures; inside a layer keep the array order
+function layerOrder(tokens) { return [...tokens.filter(isObjectToken), ...tokens.filter(t => !isObjectToken(t))]; }
+// Topmost token under a screen point (array index), optionally ignoring locked objects
+function tokenIndexAt(loc, cx, cy, skipLocked) {
+    const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
+    const order = layerOrder(loc.tokens);
+    for (let k = order.length - 1; k >= 0; k--) {
+        const t = order[k];
+        if (skipLocked && isLockedObject(t)) continue;
+        if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) return loc.tokens.indexOf(t);
+    }
+    return -1;
+}
+function setTokenLayer(t, layer) {
+    if (layer === 'object') t.layer = 'object'; else delete t.layer;
+    if (layer === 'object') state.selectedTokenIds.delete(t.id);
+    pushHistory(); refreshPropsPanel(); emit('canvas:redraw');
+}
+function updateLockButton() {
+    const b = document.getElementById('btn-lock-objects');
+    b.textContent = state.objectsLocked ? '🔒 Объекты' : '🔓 Объекты';
+    b.classList.toggle('active', state.objectsLocked);
+    b.title = state.objectsLocked ? 'Объекты закреплены — их нельзя случайно сдвинуть. Нажми, чтобы разблокировать' : 'Объекты можно двигать. Нажми, чтобы закрепить';
+}
+
+// ============================================================
 //  TOKEN CONTEXT MENU — header with stats, open card, duplicate with numbering, z-order
 // ============================================================
 function menuTargetToken() {
@@ -2809,7 +2846,7 @@ on('initiative:update', renderInitiative);
 // Initiative buttons
 document.getElementById('init-import-btn').addEventListener('click', () => {
     const loc = getCurrentLocation(); if (!loc) return;
-    loc.tokens.forEach(t => addTokenToInitiative(t));
+    loc.tokens.filter(t => !isObjectToken(t)).forEach(t => addTokenToInitiative(t));
 });
 document.getElementById('init-add-btn').addEventListener('click', () => {
     state.initiative.combatants.push({ id: Date.now(), name: 'Существо', init: 10, hp: '', tokenRef: null });
@@ -3232,7 +3269,7 @@ function initPropsPanel() {
         grid.appendChild(btn);
     });
 
-    document.querySelectorAll('.props-size-btn').forEach(btn => {
+    document.querySelectorAll('.props-size-btn[data-mul]').forEach(btn => {
         btn.addEventListener('click', () => {
             const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
             const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
@@ -3270,6 +3307,17 @@ function initPropsPanel() {
         t.light = Math.max(0, parseInt(document.getElementById('prop-light').value) || 0);
         pushHistory(); emit('canvas:redraw');
     });
+    document.querySelectorAll('#prop-layer button').forEach(b => b.addEventListener('click', () => {
+        const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+        const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+        setTokenLayer(t, b.dataset.layer);
+    }));
+    document.getElementById('btn-lock-objects').addEventListener('click', () => {
+        state.objectsLocked = !state.objectsLocked; updateLockButton();
+        if (state.objectsLocked) { const loc = getCurrentLocation(); if (loc) loc.tokens.filter(isObjectToken).forEach(t => state.selectedTokenIds.delete(t.id)); }
+        drawCanvas();
+    });
+    updateLockButton();
     document.getElementById('prop-hidden').addEventListener('change', (e) => {
         const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
         const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
@@ -3308,12 +3356,8 @@ function initPropsPanel() {
             const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
             const z = state.zoomLevel, ox = state.offsetX, oy = state.offsetY;
             const loc = getCurrentLocation(); if (!loc) return;
-            for (let i = loc.tokens.length - 1; i >= 0; i--) {
-                const t = loc.tokens[i];
-                if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
-                    openPropsForToken(t.id); return;
-                }
-            }
+            const i = tokenIndexAt(loc, cx, cy, false);
+            if (i >= 0) openPropsForToken(loc.tokens[i].id);
         }
     });
 }
@@ -3349,10 +3393,11 @@ function refreshPropsPanel() {
     document.getElementById('prop-light').value = t.light || '';
     document.getElementById('prop-pc').checked = !!t.pc;
     document.getElementById('prop-hidden').checked = !!t.hidden;
+    document.querySelectorAll('#prop-layer button').forEach(b => b.classList.toggle('active', (t.layer || 'token') === b.dataset.layer));
     document.getElementById('prop-darkvision').value = t.darkvision || '';
 
     const mul = (t.radius || 25) / 25;
-    document.querySelectorAll('.props-size-btn').forEach(b => {
+    document.querySelectorAll('.props-size-btn[data-mul]').forEach(b => {
         b.classList.toggle('active', parseFloat(b.dataset.mul) === mul);
     });
     document.querySelectorAll('.props-status-btn').forEach(b => {
