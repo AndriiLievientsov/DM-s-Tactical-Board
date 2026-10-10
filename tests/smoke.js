@@ -70,6 +70,29 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   assert.deepStrictEqual(hex, { onCentre: true, d: 3, saved: 'hex' });
   await page.evaluate(() => document.getElementById('grid-type-toggle').click());
 
+  // Walls block light; an open door lets it through; walls are drawn by clicks in walls mode
+  const light = await page.evaluate(() => {
+    const loc = getCurrentLocation();
+    loc.walls = [{ id: 1, points: [{ x: 150, y: 0 }, { x: 150, y: 200 }], door: false, open: false }];
+    const rightmost = () => visibilityPolygon(100, 100, 300, blockingSegments(loc)).find(p => p.x > 100 && Math.abs(p.y - 100) < 1e-6).x;   // the ray at angle 0
+    const blocked = rightmost();
+    loc.walls[0].door = true; loc.walls[0].open = true;
+    const open = rightmost();
+    loc.lighting = 'dark'; drawCanvas();
+    return { blocked: Math.round(blocked), open: Math.round(open) };
+  });
+  assert.deepStrictEqual(light, { blocked: 150, open: 400 });
+  // Polygon vertices must go around in angle order (mixed angle ranges once produced dark wedges)
+  assert.ok(await page.evaluate(() => {
+    const segs = [[{ x: 350, y: 50 }, { x: 350, y: 175 }], [{ x: 350, y: 275 }, { x: 350, y: 400 }]];
+    const a = visibilityPolygon(175, 225, 400, segs).map(p => Math.atan2(p.y - 225, p.x - 175));
+    return a.every((v, i) => i === 0 || v >= a[i - 1] - 1e-3);
+  }), 'visibility polygon out of order');
+  await page.keyboard.press('w');
+  await page.mouse.click(600, 300); await page.mouse.click(700, 300); await page.keyboard.press('Enter');
+  assert.strictEqual(await page.evaluate(() => getCurrentLocation().walls.length), 2, 'wall not drawn by clicks');
+  await page.keyboard.press('h');
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
@@ -90,6 +113,9 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   await p2.waitForTimeout(500);
   const pl = await p2.evaluate(() => ({ tokens: getCurrentLocation().tokens.length, fog: getCurrentLocation().fog.length }));
   assert.deepStrictEqual(pl, { tokens: 1, fog: 0 });
+  await page.evaluate(() => { const l = getCurrentLocation(); l.walls = [{ id: 5, points: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }]; l.lighting = 'dark'; drawCanvas(); });
+  await p2.waitForTimeout(400);
+  assert.deepStrictEqual(await p2.evaluate(() => [getCurrentLocation().walls.length, getCurrentLocation().lighting]), [1, 'dark']);
 
   // Pinch zoom
   const cdp = await ctx.newCDPSession(page);
