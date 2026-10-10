@@ -428,6 +428,9 @@
                         <label>Имя</label>
                         <input id="prop-name" type="text" placeholder="Имя токена">
                     </div>
+                    <div class="props-field">
+                        <label for="prop-hidden" style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer;"><input id="prop-hidden" type="checkbox"> 🙈 Скрыт от игроков</label>
+                    </div>
                     <div class="props-row">
                         <div class="props-field">
                             <label>HP</label>
@@ -567,6 +570,7 @@
         <li data-action="hp-plus5" style="color:#81c784;">❤️ +5 HP</li>
         <li data-action="hp-minus5" style="color:#ff9090;">💔 −5 HP</li>
         <li data-action="toggle-dead">💀 Мёртв / жив</li>
+        <li data-action="toggle-hidden" id="token-menu-hidden">🙈 Скрыть от игроков</li>
         <li class="ctx-sep"></li>
         <li data-action="duplicate-token">⧉ Дублировать</li>
         <li data-action="token-front">⬆ На передний план</li>
@@ -1589,6 +1593,8 @@ async function drawTokens(tokens, z, ox, oy) {
     if (!tokens) return;
     for (const t of tokens) {
         const sx = t.x * z + ox, sy = t.y * z + oy, sr = t.radius * z;
+        ctx.save();
+        if (t.hidden) ctx.globalAlpha = 0.45;
         try {
             const img = await loadImage(t.src, `token_${t.id}`);
             ctx.save();
@@ -1605,6 +1611,17 @@ async function drawTokens(tokens, z, ox, oy) {
             ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2; ctx.stroke();
         }
         if (isTokenDead(t)) drawDeadMark(sx, sy, sr);
+        ctx.restore();
+        if (t.hidden) {   // dashed ring + eye badge: "players can't see this"
+            ctx.save();
+            ctx.beginPath(); ctx.arc(sx, sy, sr + 2, 0, Math.PI * 2);
+            ctx.strokeStyle = '#b0bec5'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+            const br = Math.max(8, sr * 0.32), bx = sx + sr * 0.75, by = sy + sr * 0.75;
+            ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fillStyle = 'rgba(10,10,16,0.85)'; ctx.fill();
+            ctx.font = `${br * 1.2}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('🙈', bx, by + 1);
+            ctx.restore();
+        }
         // HP bar — thin colored strip under the token (DM only)
         if (!isPlayer && t.hp !== undefined && t.hp !== null && t.hp !== '' && t.maxHp) {
             const pct = Math.max(0, Math.min(1, parseInt(t.hp) / parseInt(t.maxHp)));
@@ -2187,6 +2204,7 @@ document.getElementById('token-menu').addEventListener('click', (e) => {
         if (action === 'duplicate-token') duplicateMenuToken();
         if (action === 'token-front' || action === 'token-back') reorderMenuToken(action === 'token-front');
         if (action === 'toggle-dead') toggleTokenDead();
+        if (action === 'toggle-hidden') toggleMenuTokenHidden();
         hideAllContextMenus();
     }
 });
@@ -2609,6 +2627,8 @@ function fillTokenMenuHead(t) {
     if (Number.isFinite(t.ac)) bits.push(`🛡 КД ${t.ac}`);
     if (Number.isFinite(t.speed)) bits.push(`🏃 ${t.speed} фт`);
     if (isTokenDead(t)) bits.push('💀');
+    if (t.hidden) bits.push('🙈 скрыт');
+    document.getElementById('token-menu-hidden').textContent = t.hidden ? '👁 Показать игрокам' : '🙈 Скрыть от игроков';
     head.append(name);
     if (bits.length) { const sub = document.createElement('div'); sub.textContent = bits.join('  ·  '); head.append(sub); }
 }
@@ -2636,6 +2656,18 @@ function duplicateMenuToken() {
     pushHistory(); emit('canvas:redraw');
     return copy;
 }
+// Hidden tokens (ambushes, traps) are drawn faded for the DM and never sent to the player window.
+// With several tokens selected the menu hides/shows the whole selection.
+function setTokensHidden(tokens, hidden) {
+    tokens.forEach(t => { if (hidden) t.hidden = true; else delete t.hidden; });
+    pushHistory(); refreshPropsPanel(); emit('canvas:redraw');
+}
+function toggleMenuTokenHidden() {
+    const loc = getCurrentLocation(), t = menuTargetToken(); if (!loc || !t) return;
+    const group = state.selectedTokenIds.has(t.id) ? loc.tokens.filter(o => state.selectedTokenIds.has(o.id)) : [t];
+    setTokensHidden(group, !t.hidden);
+}
+
 function reorderMenuToken(toFront) {
     const loc = getCurrentLocation(), t = menuTargetToken(); if (!loc || !t) return;
     loc.tokens.splice(state.menuTargetTokenIndex, 1);
@@ -3238,6 +3270,11 @@ function initPropsPanel() {
         t.light = Math.max(0, parseInt(document.getElementById('prop-light').value) || 0);
         pushHistory(); emit('canvas:redraw');
     });
+    document.getElementById('prop-hidden').addEventListener('change', (e) => {
+        const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+        const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+        setTokensHidden([t], e.target.checked);
+    });
     document.getElementById('prop-pc').addEventListener('change', () => {
         const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
         const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
@@ -3311,6 +3348,7 @@ function refreshPropsPanel() {
     document.getElementById('prop-maxhp').value = t.maxHp || '';
     document.getElementById('prop-light').value = t.light || '';
     document.getElementById('prop-pc').checked = !!t.pc;
+    document.getElementById('prop-hidden').checked = !!t.hidden;
     document.getElementById('prop-darkvision').value = t.darkvision || '';
 
     const mul = (t.radius || 25) / 25;
@@ -3509,7 +3547,7 @@ function scheduleBroadcast() {
 function broadcastState() {
     const loc = getCurrentLocation(); if (!loc) return;
     const bgSig = loc.bgData ? `${loc.id}:${loc.bgData.length}` : '';
-    const tokens = loc.tokens.map(t => {
+    const tokens = loc.tokens.filter(t => !t.hidden).map(t => {
         const sig = `${(t.src || '').length}`;
         const known = _sentSrc.get(String(t.id)) === sig;
         if (!known) _sentSrc.set(String(t.id), sig);

@@ -226,6 +226,18 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   await page.evaluate(() => { const l = getCurrentLocation(); l.walls = [{ id: 5, points: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }]; l.lighting = 'dark'; drawCanvas(); });
   await p2.waitForTimeout(400);
   assert.deepStrictEqual(await p2.evaluate(() => [getCurrentLocation().walls.length, getCurrentLocation().lighting]), [1, 'dark']);
+  // Hidden tokens stay on the DM's map but never reach the player window; the menu toggles them back
+  await page.evaluate(() => {
+    const l = getCurrentLocation();
+    state.menuTargetTokenIndex = l.tokens.findIndex(t => t.id === 9);
+    fillTokenMenuHead(l.tokens[state.menuTargetTokenIndex]);
+    document.querySelector('#token-menu [data-action="toggle-hidden"]').click();
+  });
+  await p2.waitForTimeout(400);
+  assert.deepStrictEqual(await p2.evaluate(() => getCurrentLocation().tokens.length), 0, 'hidden token reached players');
+  await page.evaluate(() => { openPropsForToken(9); const c = document.getElementById('prop-hidden'); c.checked = false; c.dispatchEvent(new Event('change')); });
+  await p2.waitForTimeout(400);
+  assert.deepStrictEqual(await p2.evaluate(() => getCurrentLocation().tokens.length), 1, 'unhidden token missing for players');
 
   // Pinch zoom
   const cdp = await ctx.newCDPSession(page);
