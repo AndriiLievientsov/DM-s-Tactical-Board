@@ -113,6 +113,13 @@
         #dice-toggle-btn.active { background: #7b2fff; color: white; border-color: #9b5fff; }
         #dice-popup { position: absolute; top: calc(100% + 8px); right: 0; background: #202026; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; width: 220px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; z-index: 100; }
         #dice-popup.show { display: block; }
+        #dice-share-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #aaa; margin-bottom: 8px; cursor: pointer; }
+        #player-roll { position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(20,20,28,0.92); border: 2px solid #7b2fff; border-radius: 12px; padding: 14px 28px; text-align: center; z-index: 5000; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+        #player-roll.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #player-roll .pr-label { font-size: 18px; color: #ccc; }
+        #player-roll .pr-total { font-size: 56px; font-weight: bold; color: #ffd166; line-height: 1.1; }
+        #player-roll .pr-detail { font-size: 14px; color: #999; max-width: 70vw; }
+        #player-roll.crit { border-color: #ffd166; box-shadow: 0 0 30px rgba(255,209,102,0.5); }
         #help-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9000; display: none; align-items: center; justify-content: center; padding: 16px; }
         #help-overlay.show { display: flex; }
         #help-box { background: #202026; border: 1px solid var(--border-color); border-radius: 10px; width: min(720px, 100%); max-height: 90vh; overflow: auto; padding: 20px 24px; box-shadow: 0 16px 48px rgba(0,0,0,0.7); color: #ddd; font-size: 13px; line-height: 1.5; }
@@ -367,6 +374,7 @@
             <div class="dice-container">
                 <button id="dice-toggle-btn">🎲 Кубики</button>
                 <div id="dice-popup">
+                    <label id="dice-share-row" title="Результат броска крупно появится в окне игроков"><input type="checkbox" id="dice-share"> 📢 Показывать игрокам</label>
                     <div id="dice-buttons"></div>
                     <div style="display:flex;gap:4px;margin-bottom:8px;">
                         <input id="dice-formula" type="text" placeholder="2d6+3, 4d6kh3…"
@@ -510,6 +518,8 @@
             <canvas id="game-canvas"></canvas>
         </main>
     </div>
+
+    <div id="player-roll" aria-live="polite"><div class="pr-label"></div><div class="pr-total"></div><div class="pr-detail"></div></div>
 
     <!-- Help / first-run guide -->
     <div id="help-overlay" role="dialog" aria-modal="true" aria-labelledby="help-title">
@@ -3192,7 +3202,10 @@ function parseDiceFormula(formula) {
 }
 
 // Show a roll in the dice popup/history (used by the dice roller and stat-block attacks)
-function recordRoll(label, total, detail) {
+function recordRoll(label, total, detail, crit) {
+    if (bc && !isPlayer && document.getElementById('dice-share').checked) {
+        try { bc.postMessage({ type: 'roll', label: String(label), total: String(total), detail: String(detail || ''), crit: !!crit }); } catch (e) {}
+    }
     document.getElementById('dice-result').innerText = `🎲 ${total}`;
     document.getElementById('dice-detail').innerText = detail;
     document.getElementById('dice-toggle-btn').innerText = `🎲 ${label}: ${total}`;
@@ -3203,6 +3216,19 @@ function recordRoll(label, total, detail) {
     while (history.children.length > 8) history.removeChild(history.lastChild);
 }
 
+// Player window: big roll banner that fades out by itself
+let _playerRollTimer = null;
+function showPlayerRoll(m) {
+    const box = document.getElementById('player-roll');
+    box.querySelector('.pr-label').textContent = `🎲 ${m.label}`;
+    box.querySelector('.pr-total').textContent = m.total;
+    box.querySelector('.pr-detail').textContent = m.detail;
+    box.classList.toggle('crit', !!m.crit);
+    box.classList.add('show');
+    clearTimeout(_playerRollTimer);
+    _playerRollTimer = setTimeout(() => box.classList.remove('show'), 5000);
+}
+
 function initDiceRoller() {
     const container = document.getElementById('dice-buttons');
     const result    = document.getElementById('dice-result');
@@ -3211,6 +3237,11 @@ function initDiceRoller() {
     const toggleBtn = document.getElementById('dice-toggle-btn');
     const popup     = document.getElementById('dice-popup');
     const formulaIn = document.getElementById('dice-formula');
+
+    const share = document.getElementById('dice-share');
+    try { share.checked = localStorage.getItem('dms_share_rolls') === '1'; } catch (e) {}
+    share.addEventListener('change', () => { try { localStorage.setItem('dms_share_rolls', share.checked ? '1' : '0'); } catch (e) {} });
+    document.getElementById('dice-share-row').addEventListener('click', (e) => e.stopPropagation());
 
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3453,7 +3484,7 @@ function rollAttack(t, a) {
     const log = document.getElementById('sb-roll-log');
     log.textContent = lines.join('\n');
     log.classList.toggle('crit', crit);
-    recordRoll(who, hit + (dmg ? ` / ${dmg.total}` : ''), lines.slice(1).join('; '));
+    recordRoll(who, hit + (dmg ? ` / ${dmg.total}` : ''), lines.slice(1).join('; '), crit);
     return { d20, hit, crit, damage: dmg ? dmg.total : null };
 }
 
@@ -3631,6 +3662,7 @@ if (isPlayer) {
     bc.onmessage = (ev) => {
         const m = ev.data; if (!m) return;
         if (m.type === 'ping') { createPing(m.x, m.y); return; }
+        if (m.type === 'roll') { showPlayerRoll(m); return; }
         if (m.type !== 'state') return;
         if (m.bgData !== undefined || m.bgSig !== playerBgSig) {
             if (m.bgData !== undefined) playerBg = m.bgData;
