@@ -310,6 +310,7 @@
                 <div class="drawing-popup" id="walls-menu-popup">
                     <div class="popup-title">Освещение локации</div>
                     <button class="tree-btn" id="lighting-toggle-btn" style="width:100%;">🌙 Темнота: выкл</button>
+                    <button class="tree-btn" id="vision-toggle-btn" style="width:100%;margin-top:6px;" title="Игроки видят только то, что на линии видимости персонажей (токены с отметкой «Персонаж игрока»)">👁 Обзор персонажей: выкл</button>
                     <div class="popup-title" id="dm-dark-text">Темнота у мастера: 60%</div>
                     <input type="range" class="size-slider" id="dm-dark-slider" min="0" max="95" value="60">
                     <div style="font-size:11px;color:#888;margin-top:8px;line-height:1.5;">
@@ -420,6 +421,15 @@
                     <div class="props-field">
                         <label for="prop-light">Свет (радиус, фт)</label>
                         <input id="prop-light" type="number" min="0" max="600" step="5" placeholder="0 — не светит (факел 40, фонарь 60)">
+                    </div>
+                    <div class="props-row">
+                        <div class="props-field">
+                            <label for="prop-pc" style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer;"><input id="prop-pc" type="checkbox"> Персонаж игрока</label>
+                        </div>
+                        <div class="props-field">
+                            <label for="prop-darkvision">Тёмное зрение, фт</label>
+                            <input id="prop-darkvision" type="number" min="0" max="600" step="5" placeholder="0 (обычно 60)">
+                        </div>
                     </div>
                     <div class="props-field">
                         <label>Статусы</label>
@@ -934,6 +944,7 @@ function normalizeAdventure(raw) {
             id: t.id ?? (Date.now() + j + Math.random()),
             x: num(t.x, 0), y: num(t.y, 0), radius: num(t.radius, 25),
             name: String(t.name ?? ''), rotation: num(t.rotation, 0), light: Math.max(0, num(t.light, 0)),
+            pc: !!t.pc, darkvision: Math.max(0, num(t.darkvision, 0)),
             statuses: arr(t.statuses).map(String),
             statusRounds: Object.fromEntries(Object.entries((t.statusRounds && typeof t.statusRounds === 'object') ? t.statusRounds : {})
                 .filter(([, n]) => Number.isInteger(n) && n > 0)),
@@ -950,6 +961,7 @@ function normalizeAdventure(raw) {
             door: !!w.door, open: !!w.open,
         })),
         lighting: l.lighting === 'dark' ? 'dark' : 'off',
+        vision: !!l.vision,
         zoomLevel: num(l.zoomLevel, 1.0), offsetX: num(l.offsetX, 50), offsetY: num(l.offsetY, 50),
         cellSize: num(l.cellSize, 50),
         gridType: l.gridType === 'hex' ? 'hex' : 'square',
@@ -1144,32 +1156,56 @@ function visibilityPolygon(cx, cy, R, segs) {
     });
 }
 const _lightCanvas = document.createElement('canvas');
-function drawLighting(loc, z, ox, oy) {
-    if (loc.lighting !== 'dark') return;
-    const alpha = isPlayer ? 1 : state.dmDarkAlpha;
-    if (alpha <= 0) return;
-    _lightCanvas.width = canvas.width; _lightCanvas.height = canvas.height;
-    const lc = _lightCanvas.getContext('2d');
-    lc.fillStyle = `rgba(0,0,0,${alpha})`;
-    lc.fillRect(0, 0, canvas.width, canvas.height);
-    lc.globalCompositeOperation = 'destination-out';
-    const segs = blockingSegments(loc);
-    loc.tokens.forEach(t => {
-        if (!(t.light > 0)) return;
-        const R = t.light / 5 * state.cellSize;
-        const poly = visibilityPolygon(t.x, t.y, R, segs);
-        const sx = t.x * z + ox, sy = t.y * z + oy;
-        const grad = lc.createRadialGradient(sx, sy, 0, sx, sy, R * z);
-        grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(0.5, 'rgba(0,0,0,1)');   // bright half, then dim falloff
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        lc.fillStyle = grad;
-        lc.beginPath();
-        poly.forEach((p, i) => { const px = p.x * z + ox, py = p.y * z + oy; if (i) lc.lineTo(px, py); else lc.moveTo(px, py); });
-        lc.closePath(); lc.fill();
-    });
-    ctx.drawImage(_lightCanvas, 0, 0);
+// Fill a visibility polygon (map coords) on a 2D context in screen space
+function fillPolygon(c, poly, z, ox, oy) {
+    c.beginPath();
+    poly.forEach((p, i) => { const px = p.x * z + ox, py = p.y * z + oy; if (i) c.lineTo(px, py); else c.moveTo(px, py); });
+    c.closePath(); c.fill();
 }
-const wallsVisible = (loc) => !isPlayer && (state.currentMode === 'walls' || loc.lighting === 'dark');
+const _visionCanvas = document.createElement('canvas');
+function drawLighting(loc, z, ox, oy) {
+    const pcs = loc.tokens.filter(t => t.pc);
+    const segs = blockingSegments(loc);
+    // 1) Darkness: lit by light sources; player characters with darkvision also see (dimly) around them
+    if (loc.lighting === 'dark') {
+        const alpha = isPlayer ? 1 : state.dmDarkAlpha;
+        if (alpha > 0) {
+            _lightCanvas.width = canvas.width; _lightCanvas.height = canvas.height;
+            const lc = _lightCanvas.getContext('2d');
+            lc.fillStyle = `rgba(0,0,0,${alpha})`;
+            lc.fillRect(0, 0, canvas.width, canvas.height);
+            lc.globalCompositeOperation = 'destination-out';
+            const reveal = (t, feet, strength, brightPart) => {
+                const R = feet / 5 * state.cellSize;
+                const sx = t.x * z + ox, sy = t.y * z + oy;
+                const grad = lc.createRadialGradient(sx, sy, 0, sx, sy, R * z);
+                grad.addColorStop(0, `rgba(0,0,0,${strength})`); grad.addColorStop(brightPart, `rgba(0,0,0,${strength})`);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                lc.fillStyle = grad;
+                fillPolygon(lc, visibilityPolygon(t.x, t.y, R, segs), z, ox, oy);
+            };
+            loc.tokens.forEach(t => { if (t.light > 0) reveal(t, t.light, 1, 0.5); });            // bright half, then dim falloff
+            pcs.forEach(t => { if (t.darkvision > 0) reveal(t, t.darkvision, 0.6, 0.85); });     // darkvision: dim, no colour of light
+            ctx.drawImage(_lightCanvas, 0, 0);
+        }
+    }
+    // 2) Line of sight: players only see what at least one player character can see; walls block it
+    if (loc.vision && pcs.length) {
+        const alpha = isPlayer ? 1 : state.dmDarkAlpha * 0.5;
+        if (alpha > 0) {
+            _visionCanvas.width = canvas.width; _visionCanvas.height = canvas.height;
+            const vc = _visionCanvas.getContext('2d');
+            vc.fillStyle = `rgba(0,0,0,${alpha})`;
+            vc.fillRect(0, 0, canvas.width, canvas.height);
+            vc.globalCompositeOperation = 'destination-out';
+            vc.fillStyle = '#000';
+            const far = 100000;   // effectively unlimited sight range
+            pcs.forEach(t => fillPolygon(vc, visibilityPolygon(t.x, t.y, far, segs), z, ox, oy));
+            ctx.drawImage(_visionCanvas, 0, 0);
+        }
+    }
+}
+const wallsVisible = (loc) => !isPlayer && (state.currentMode === 'walls' || loc.lighting === 'dark' || loc.vision);
 function drawWalls(loc, z, ox, oy) {
     if (!wallsVisible(loc)) return;
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -2903,6 +2939,18 @@ function initPropsPanel() {
         t.light = Math.max(0, parseInt(document.getElementById('prop-light').value) || 0);
         pushHistory(); emit('canvas:redraw');
     });
+    document.getElementById('prop-pc').addEventListener('change', () => {
+        const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+        const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+        t.pc = document.getElementById('prop-pc').checked;
+        pushHistory(); emit('canvas:redraw');
+    });
+    document.getElementById('prop-darkvision').addEventListener('change', () => {
+        const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+        const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+        t.darkvision = Math.max(0, parseInt(document.getElementById('prop-darkvision').value) || 0);
+        pushHistory(); emit('canvas:redraw');
+    });
     document.getElementById('prop-maxhp').addEventListener('input', () => {
         clearTimeout(_maxHpTimer); _maxHpTimer = setTimeout(() => {
             const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
@@ -2963,6 +3011,8 @@ function refreshPropsPanel() {
     document.getElementById('prop-hp').value = t.hp !== undefined && t.hp !== '' ? t.hp : '';
     document.getElementById('prop-maxhp').value = t.maxHp || '';
     document.getElementById('prop-light').value = t.light || '';
+    document.getElementById('prop-pc').checked = !!t.pc;
+    document.getElementById('prop-darkvision').value = t.darkvision || '';
 
     const mul = (t.radius || 25) / 25;
     document.querySelectorAll('.props-size-btn').forEach(b => {
@@ -3082,7 +3132,18 @@ function updateLightingUI() {
     const dark = loc && loc.lighting === 'dark';
     b.textContent = dark ? '🌙 Темнота: вкл' : '🌙 Темнота: выкл';
     b.style.background = dark ? '#2e5cb8' : '';
+    const v = document.getElementById('vision-toggle-btn');
+    const on = loc && loc.vision;
+    v.textContent = on ? '👁 Обзор персонажей: вкл' : '👁 Обзор персонажей: выкл';
+    v.style.background = on ? '#2e5cb8' : '';
 }
+document.getElementById('vision-toggle-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const loc = getCurrentLocation(); if (!loc) return;
+    loc.vision = !loc.vision;
+    if (loc.vision && !loc.tokens.some(t => t.pc)) showToast('Отметь токены персонажей: панель токена → «Персонаж игрока»');
+    updateLightingUI(); markDirty(); drawCanvas();
+});
 document.getElementById('lighting-toggle-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     const loc = getCurrentLocation(); if (!loc) return;
@@ -3159,7 +3220,7 @@ function broadcastState() {
     const msg = {
         type: 'state', locId: loc.id, locName: loc.name, bgSig, tokens,
         drawings: loc.drawings, fog: (loc.fog || []).filter(a => !a.hidden),
-        walls: loc.walls || [], lighting: loc.lighting || 'off',
+        walls: loc.walls || [], lighting: loc.lighting || 'off', vision: !!loc.vision,
         grid: { on: state.isGridEnabled, opacity: state.gridOpacity, color: state.gridColor, cell: state.cellSize, type: state.gridType },
         init: { ids: state.initiative.combatants.map(c => c.tokenRef), idx: state.initiative.currentIndex },
     };
@@ -3198,7 +3259,7 @@ if (isPlayer) {
             if (t.src !== undefined) playerSrc.set(String(t.id), t.src);
             return { ...t, src: t.src !== undefined ? t.src : playerSrc.get(String(t.id)) };
         });
-        state.adventureData = { locations: [{ id: m.locId, name: m.locName, bgData: playerBg, tokens, drawings: m.drawings, fog: m.fog, walls: m.walls || [], lighting: m.lighting }], currentLocationId: m.locId, library: [] };
+        state.adventureData = { locations: [{ id: m.locId, name: m.locName, bgData: playerBg, tokens, drawings: m.drawings, fog: m.fog, walls: m.walls || [], lighting: m.lighting, vision: m.vision }], currentLocationId: m.locId, library: [] };
         state.isGridEnabled = m.grid.on; state.gridOpacity = m.grid.opacity; state.gridColor = m.grid.color; state.cellSize = m.grid.cell; state.gridType = m.grid.type;
         state.initiative = { combatants: m.init.ids.map(id => ({ tokenRef: id })), currentIndex: m.init.idx, round: 1 };
         drawCanvas();
