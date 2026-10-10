@@ -229,6 +229,27 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   }, PNG);
   assert.deepStrictEqual(lay, { order: ['Сундук', 'Вор'], top: 'Вор', lockedMiss: -1, unlockedHit: 'Сундук', inInit: false });
 
+  // Encounters: save selected tokens, place them again with numbered names and straight into initiative
+  const enc = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 201, src: png, x: 100, y: 300, radius: 25, name: 'Гоблин', hp: 2, maxHp: 7, rotation: 0 },
+                  { id: 202, src: png, x: 200, y: 300, radius: 25, name: 'Гоблин', hp: 7, maxHp: 7, rotation: 0 });
+    state.selectedTokenIds = new Set([201, 202]);
+    const e = saveEncounterFromSelection('Засада');
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    const placed = placeEncounter(e.id, true);
+    const r = {
+      saved: [e.tokens.length, e.tokens[0].hp, e.tokens[1].dx - e.tokens[0].dx],
+      names: placed.map(t => t.name), gap: placed[1].x - placed[0].x,
+      init: state.initiative.combatants.length, listed: document.querySelectorAll('#enc-list li').length,
+      kept: normalizeAdventure(state.adventureData).encounters.length,
+    };
+    l.tokens = l.tokens.filter(t => t.id !== 201 && t.id !== 202 && !placed.includes(t));
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 }; state.selectedTokenIds = new Set();
+    return r;
+  }, PNG);
+  assert.deepStrictEqual(enc, { saved: [2, 7, 100], names: ['Гоблин 2', 'Гоблин 3'], gap: 100, init: 2, listed: 1, kept: 1 });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
