@@ -104,6 +104,26 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
     const a = visibilityPolygon(175, 225, 400, segs).map(p => Math.atan2(p.y - 225, p.x - 175));
     return a.every((v, i) => i === 0 || v >= a[i - 1] - 1e-3);
   }), 'visibility polygon out of order');
+  // Line of sight & darkvision: pixel behind a wall is hidden from players, in front of it is visible
+  const sight = await page.evaluate(async () => {
+    const loc = getCurrentLocation();
+    const saved = { walls: loc.walls, tokens: loc.tokens, bg: loc.bgData, z: state.zoomLevel, ox: state.offsetX, oy: state.offsetY };
+    loc.bgData = null; loc.lighting = 'off'; loc.vision = true;
+    loc.walls = [{ id: 9, points: [{ x: 300, y: -1000 }, { x: 300, y: 1000 }], door: false, open: false }];
+    loc.tokens = [{ id: 501, src: '', x: 100, y: 100, radius: 10, name: '', rotation: 0, statuses: [], pc: true, darkvision: 60 }];
+    state.zoomLevel = 1; state.offsetX = 0; state.offsetY = 0; state.dmDarkAlpha = 0.9;
+    await drawCanvas();
+    const px = (x, y) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3)).reduce((a, b) => a + b, 0);
+    const front = px(200, 300), behind = px(400, 300);
+    loc.vision = false; loc.walls = []; loc.lighting = 'dark'; await drawCanvas();
+    const inDarkvision = px(150, 150), outside = px(900, 600);
+    loc.lighting = 'off';
+    Object.assign(loc, { walls: saved.walls, tokens: saved.tokens, bgData: saved.bg });
+    Object.assign(state, { zoomLevel: saved.z, offsetX: saved.ox, offsetY: saved.oy, dmDarkAlpha: 0.6 });
+    return { hidesBehindWall: behind < front, darkvisionReveals: inDarkvision > outside };
+  });
+  assert.deepStrictEqual(sight, { hidesBehindWall: true, darkvisionReveals: true });
+
   await page.keyboard.press('w');
   await page.mouse.click(600, 300); await page.mouse.click(700, 300); await page.keyboard.press('Enter');
   assert.strictEqual(await page.evaluate(() => getCurrentLocation().walls.length), 2, 'wall not drawn by clicks');
