@@ -46,6 +46,18 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   await page.evaluate(() => applyAdventure({ locations: [{ id: 5, name: 'x' }] }));
   assert.deepStrictEqual(await page.evaluate(() => getCurrentLocation().tokens), []);
 
+  // Status durations tick down on the token's turn and expire
+  const dur = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 77, src: png, x: 100, y: 100, radius: 25, name: 'Маг', rotation: 0, statuses: ['🔥', '🛡️'], statusRounds: { '🔥': 2 } });
+    state.initiative = { combatants: [{ id: 1, name: 'Маг', init: 10, hp: '', tokenRef: 77 }], currentIndex: 0, round: 1 };
+    const next = () => document.getElementById('init-next-btn').click();
+    next(); const after1 = JSON.stringify(l.tokens.find(t => t.id === 77).statuses);
+    next(); const t = l.tokens.find(t => t.id === 77);
+    return { after1, after2: JSON.stringify(t.statuses), rounds: JSON.stringify(t.statusRounds) };
+  }, PNG);
+  assert.deepStrictEqual(dur, { after1: '["🔥","🛡️"]', after2: '["🛡️"]', rounds: '{}' });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);

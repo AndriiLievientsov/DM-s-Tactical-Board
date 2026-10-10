@@ -156,6 +156,13 @@
         .cell-size-row label { display: block; font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
         .cell-size-row input, .tpl-row input { width: 100%; background: #14141a; border: 1px solid var(--border-color); color: var(--text-color); padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none; }
         .tpl-row { margin-top: 8px; }
+        .status-dur-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: #ccc; }
+        .status-dur-row span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .props-field .status-dur-row input { width: 90px; flex: none; background: #14141a; border: 1px solid var(--border-color); color: #ffd166; padding: 3px 6px; border-radius: 4px; font-size: 12px; text-align: center; }
+        #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #2a2a32; border: 1px solid #ffd166; color: #ffd166; padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 2000; opacity: 0; transition: opacity .25s; pointer-events: none; }
+        #toast.show { opacity: 1; }
+        /* Narrower screens: tools move to their own full-width second row instead of squeezing into a column */
+        @media (max-width: 1800px) { .center-block { order: 3; flex-basis: 100%; } }
         :focus-visible { outline: 2px solid #ffd166; outline-offset: 1px; }
 
         /* Player window: map only */
@@ -390,6 +397,7 @@
                     <div class="props-field">
                         <label>Статусы</label>
                         <div class="props-status-grid" id="props-status-grid"></div>
+                        <div id="props-status-durations"></div>
                     </div>
                 </div>
             </div>
@@ -869,6 +877,8 @@ function normalizeAdventure(raw) {
             x: num(t.x, 0), y: num(t.y, 0), radius: num(t.radius, 25),
             name: String(t.name ?? ''), rotation: num(t.rotation, 0),
             statuses: arr(t.statuses).map(String),
+            statusRounds: Object.fromEntries(Object.entries((t.statusRounds && typeof t.statusRounds === 'object') ? t.statusRounds : {})
+                .filter(([, n]) => Number.isInteger(n) && n > 0)),
         })),
         drawings: arr(l.drawings).filter(d => d && Array.isArray(d.points)),
         fog: arr(l.fog).filter(a => a && Array.isArray(a.points)),
@@ -1234,6 +1244,17 @@ async function drawTokens(tokens, z, ox, oy) {
                 ctx.fillStyle = 'rgba(10,10,16,0.82)'; ctx.fill();
                 ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke();
                 ctx.fillText(icon, bx2, by2);
+                const left = t.statusRounds && t.statusRounds[icon];
+                if (left) {   // rounds remaining — small counter at the badge's lower right
+                    const cr = Math.max(6, badgeR * 0.55);
+                    const cx2 = bx2 + badgeR * 0.75, cy2 = by2 + badgeR * 0.75;
+                    ctx.beginPath(); ctx.arc(cx2, cy2, cr, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffd166'; ctx.fill();
+                    ctx.save();
+                    ctx.font = `bold ${Math.round(cr * 1.3)}px 'Segoe UI', sans-serif`; ctx.fillStyle = '#1a1a1f';
+                    ctx.fillText(String(left), cx2, cy2 + 0.5);
+                    ctx.restore();
+                }
             });
             ctx.restore();
         }
@@ -2087,7 +2108,7 @@ function toggleTokenStatus(icon) {
     const t = loc.tokens[state.menuTargetTokenIndex];
     if (!t.statuses) t.statuses = [];
     const idx = t.statuses.indexOf(icon);
-    if (idx >= 0) t.statuses.splice(idx, 1);
+    if (idx >= 0) { t.statuses.splice(idx, 1); if (t.statusRounds) delete t.statusRounds[icon]; }
     else t.statuses.push(icon);
     // Sync to initiative list if present
     renderInitiative();
@@ -2097,6 +2118,7 @@ function clearTokenStatuses() {
     const loc = getCurrentLocation();
     if (!loc || state.menuTargetTokenIndex === null) return;
     loc.tokens[state.menuTargetTokenIndex].statuses = [];
+    loc.tokens[state.menuTargetTokenIndex].statusRounds = {};
     renderInitiative();
     pushHistory(); emit('canvas:redraw');
 }
@@ -2126,7 +2148,8 @@ function renderInitiative() {
         const isActive = idx === state.initiative.currentIndex;
         const loc = getCurrentLocation();
         const token = loc ? loc.tokens.find(t => t.id === c.tokenRef) : null;
-        const statusStr = (token && token.statuses && token.statuses.length) ? token.statuses.join('') : '';
+        const statusStr = (token && token.statuses && token.statuses.length)
+            ? token.statuses.map(i => i + (token.statusRounds && token.statusRounds[i] ? token.statusRounds[i] : '')).join(' ') : '';
 
         // Sync HP from tracker back to token if token exists
         const syncHP = (val) => {
@@ -2218,6 +2241,27 @@ document.getElementById('init-clear-btn').addEventListener('click', () => {
     state.initiative.combatants = []; state.initiative.currentIndex = -1; state.initiative.round = 1;
     renderInitiative(); emit('canvas:redraw');
 });
+// Status durations count down at the start of the affected creature's turn; at 0 the status ends.
+function tickStatusDurations(token) {
+    if (!token || !token.statusRounds) return [];
+    const expired = [];
+    for (const icon of Object.keys(token.statusRounds)) {
+        token.statusRounds[icon]--;
+        if (token.statusRounds[icon] <= 0) {
+            delete token.statusRounds[icon];
+            token.statuses = (token.statuses || []).filter(s => s !== icon);
+            expired.push(icon);
+        }
+    }
+    return expired;
+}
+let _toastTimer = null;
+function showToast(text) {
+    let el = document.getElementById('toast');
+    if (!el) { el = document.createElement('div'); el.id = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = text; el.classList.add('show');
+    clearTimeout(_toastTimer); _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
 document.getElementById('init-next-btn').addEventListener('click', () => {
     if (!state.initiative.combatants.length) return;
     state.initiative.currentIndex++;
@@ -2225,7 +2269,13 @@ document.getElementById('init-next-btn').addEventListener('click', () => {
         state.initiative.currentIndex = 0;
         state.initiative.round++;
     }
-    renderInitiative(); emit('canvas:redraw');
+    const active = state.initiative.combatants[state.initiative.currentIndex];
+    const loc = getCurrentLocation();
+    const token = loc && active ? loc.tokens.find(t => t.id === active.tokenRef) : null;
+    const expired = tickStatusDurations(token);
+    if (token && token.statusRounds && Object.keys(token.statusRounds).length + expired.length) pushHistory();
+    if (expired.length) showToast(`${token.name || 'Токен'}: закончилось ${expired.join(' ')}`);
+    renderInitiative(); refreshPropsPanel(); emit('canvas:redraw');
 });
 
 // ============================================================
@@ -2523,6 +2573,7 @@ function initDiceRoller() {
 //  TOKEN PROPERTIES PANEL
 // ============================================================
 const STATUS_LIST = ['🔥','🤢','🕶️','🧎','❄️','😴','🛡️','⚡'];
+const STATUS_NAMES = { '🔥': 'Горит', '🤢': 'Отравлен', '🕶️': 'Ослеплён', '🧎': 'Сбит с ног', '❄️': 'Заморожен', '😴': 'Без сознания', '🛡️': 'Концентрация', '⚡': 'Заряжен' };
 let _propsTargetId = null;
 
 function initPropsPanel() {
@@ -2535,7 +2586,8 @@ function initPropsPanel() {
             const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
             if (!t.statuses) t.statuses = [];
             const idx = t.statuses.indexOf(icon);
-            if (idx >= 0) t.statuses.splice(idx, 1); else t.statuses.push(icon);
+            if (idx >= 0) { t.statuses.splice(idx, 1); if (t.statusRounds) delete t.statusRounds[icon]; }
+            else t.statuses.push(icon);
             refreshPropsPanel(); renderInitiative(); pushHistory(); emit('canvas:redraw');
         });
         grid.appendChild(btn);
@@ -2638,6 +2690,26 @@ function refreshPropsPanel() {
     });
     document.querySelectorAll('.props-status-btn').forEach(b => {
         b.classList.toggle('active', t.statuses && t.statuses.includes(b.dataset.icon));
+    });
+
+    // Duration per active status (blank = until removed)
+    const durBox = document.getElementById('props-status-durations');
+    durBox.innerHTML = '';
+    (t.statuses || []).forEach(icon => {
+        const row = document.createElement('div'); row.className = 'status-dur-row';
+        const label = document.createElement('span'); label.textContent = `${icon} ${STATUS_NAMES[icon] || ''}`;
+        const input = document.createElement('input');
+        input.type = 'number'; input.min = '1'; input.max = '999'; input.placeholder = '∞ раундов';
+        input.title = 'Сколько раундов длится (пусто — бессрочно)';
+        input.setAttribute('aria-label', `Длительность: ${STATUS_NAMES[icon] || icon}`);
+        input.value = t.statusRounds && t.statusRounds[icon] ? t.statusRounds[icon] : '';
+        input.addEventListener('change', () => {
+            const n = parseInt(input.value);
+            if (!t.statusRounds) t.statusRounds = {};
+            if (n > 0) t.statusRounds[icon] = n; else { delete t.statusRounds[icon]; input.value = ''; }
+            renderInitiative(); pushHistory(); emit('canvas:redraw');
+        });
+        row.appendChild(label); row.appendChild(input); durBox.appendChild(row);
     });
 }
 
