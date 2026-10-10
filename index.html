@@ -202,6 +202,10 @@
         .ctx-menu-list { position: fixed; background: #2a2a32; border: 1px solid #3f3f4a; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; display: none; z-index: 1000; list-style: none; padding: 5px 0; min-width: 160px; user-select: none; }
         .ctx-menu-list li { padding: 8px 15px; cursor: pointer; font-size: 14px; color: var(--text-color); position: relative; display: flex; justify-content: space-between; align-items: center; }
         .ctx-menu-list li:hover { background: #383842; }
+        .ctx-menu-list li.ctx-head { cursor: default; font-size: 12px; color: #aaa; border-bottom: 1px solid #3f3f4a; padding: 6px 15px 8px; margin-bottom: 4px; display: block; }
+        .ctx-menu-list li.ctx-head:hover { background: none; }
+        .ctx-menu-list li.ctx-head b { color: #fff; font-size: 13px; }
+        .ctx-menu-list li.ctx-sep { padding: 0; margin: 4px 0; border-top: 1px solid #3f3f4a; cursor: default; }
         .ctx-menu-list li .arrow { font-size: 10px; color: #888; }
         .ctx-submenu { position: absolute; top: 0; left: 100%; background: #2a2a32; border: 1px solid #3f3f4a; border-radius: 4px; padding: 5px 0; list-style: none; min-width: 150px; display: none; box-shadow: 4px 4px 10px rgba(0,0,0,0.5); }
         .ctx-menu-list li:hover .ctx-submenu { display: block; }
@@ -519,6 +523,8 @@
 
     <!-- Context menus -->
     <ul class="ctx-menu-list" id="token-menu">
+        <li class="ctx-head" id="token-menu-head"></li>
+        <li data-action="open-card">📋 Карточка токена</li>
         <li id="token-menu-name">✏️ Изменить имя</li>
         <li id="token-menu-hp">❤️ Изменить HP</li>
         <li>
@@ -561,6 +567,10 @@
         <li data-action="hp-plus5" style="color:#81c784;">❤️ +5 HP</li>
         <li data-action="hp-minus5" style="color:#ff9090;">💔 −5 HP</li>
         <li data-action="toggle-dead">💀 Мёртв / жив</li>
+        <li class="ctx-sep"></li>
+        <li data-action="duplicate-token">⧉ Дублировать</li>
+        <li data-action="token-front">⬆ На передний план</li>
+        <li data-action="token-back">⬇ На задний план</li>
         <li data-action="copy-token">⎘ Копировать</li>
         <li data-action="delete-token" style="color: var(--accent-color);">❌ Удалить токен</li>
     </ul>
@@ -2088,8 +2098,8 @@ canvas.addEventListener('contextmenu', (e) => {
         const t = loc.tokens[i];
         if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
             state.menuTargetTokenIndex = i;
-            const m = document.getElementById('token-menu');
-            m.style.display = 'block'; m.style.left = `${e.pageX}px`; m.style.top = `${e.pageY}px`;
+            fillTokenMenuHead(t);
+            showMenuAt(document.getElementById('token-menu'), e.clientX, e.clientY);
             return;
         }
     }
@@ -2173,6 +2183,9 @@ document.getElementById('token-menu').addEventListener('click', (e) => {
         if (action === 'hp-plus5')  quickChangeHP(+5);
         if (action === 'hp-minus5') quickChangeHP(-5);
         if (action === 'copy-token') copyTokenToClipboard();
+        if (action === 'open-card') { const t = menuTargetToken(); if (t) openPropsForToken(t.id); }
+        if (action === 'duplicate-token') duplicateMenuToken();
+        if (action === 'token-front' || action === 'token-back') reorderMenuToken(action === 'token-front');
         if (action === 'toggle-dead') toggleTokenDead();
         hideAllContextMenus();
     }
@@ -2573,6 +2586,64 @@ function quickChangeHP(delta) {
     if (comb) comb.hp = t.hp;
     renderInitiative(); pushHistory(); emit('canvas:redraw');
 }
+// ============================================================
+//  TOKEN CONTEXT MENU — header with stats, open card, duplicate with numbering, z-order
+// ============================================================
+function menuTargetToken() {
+    const loc = getCurrentLocation();
+    return loc && state.menuTargetTokenIndex !== null ? loc.tokens[state.menuTargetTokenIndex] || null : null;
+}
+// Open a menu at the cursor but keep it inside the window
+function showMenuAt(m, x, y) {
+    m.style.display = 'block';
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
+    m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
+}
+function fillTokenMenuHead(t) {
+    const head = document.getElementById('token-menu-head');
+    head.textContent = '';
+    const name = document.createElement('b'); name.textContent = t.name || 'Без имени';
+    const bits = [];
+    if (t.hp !== undefined && t.hp !== '') bits.push(`❤️ ${t.hp}${t.maxHp ? '/' + t.maxHp : ''}`);
+    if (Number.isFinite(t.ac)) bits.push(`🛡 КД ${t.ac}`);
+    if (Number.isFinite(t.speed)) bits.push(`🏃 ${t.speed} фт`);
+    if (isTokenDead(t)) bits.push('💀');
+    head.append(name);
+    if (bits.length) { const sub = document.createElement('div'); sub.textContent = bits.join('  ·  '); head.append(sub); }
+}
+// "Гоблин" -> "Гоблин 2", "Гоблин 2" -> next free number
+function nextTokenName(name, tokens) {
+    const base = String(name || '').replace(/\s+\d+$/, '').trim();
+    if (!base) return '';
+    let max = 1;
+    tokens.forEach(o => {
+        const m = String(o.name || '').match(/^(.*?)\s+(\d+)$/);
+        if (m && m[1].trim() === base) max = Math.max(max, parseInt(m[2]));
+    });
+    return `${base} ${max + 1}`;
+}
+function duplicateMenuToken() {
+    const loc = getCurrentLocation(), t = menuTargetToken(); if (!loc || !t) return;
+    const copy = JSON.parse(JSON.stringify(t));
+    copy.id = Date.now() + Math.random();
+    copy.x += state.cellSize || 50;
+    copy.name = nextTokenName(t.name, loc.tokens);
+    if (t.maxHp) copy.hp = t.maxHp;
+    copy.dead = false;
+    loc.tokens.push(copy);
+    state.selectedTokenIds = new Set([copy.id]);
+    pushHistory(); emit('canvas:redraw');
+    return copy;
+}
+function reorderMenuToken(toFront) {
+    const loc = getCurrentLocation(), t = menuTargetToken(); if (!loc || !t) return;
+    loc.tokens.splice(state.menuTargetTokenIndex, 1);
+    if (toFront) loc.tokens.push(t); else loc.tokens.unshift(t);
+    state.menuTargetTokenIndex = null;
+    pushHistory(); emit('canvas:redraw');
+}
+
 function copyTokenToClipboard() {
     const loc = getCurrentLocation();
     if (!loc || state.menuTargetTokenIndex === null) return;

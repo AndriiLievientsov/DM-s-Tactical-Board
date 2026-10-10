@@ -185,6 +185,24 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   assert.deepStrictEqual(used, [25, undefined]);
   await page.evaluate(() => { state.initiative = { combatants: [], currentIndex: -1, round: 1 }; });
 
+  // Token context menu: header shows stats, duplicate numbers the name, z-order moves the token
+  const menu = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 95, src: png, x: 600, y: 400, radius: 25, name: 'Гоблин', hp: 3, maxHp: 7, ac: 15, rotation: 0 });
+    state.menuTargetTokenIndex = l.tokens.length - 1;
+    fillTokenMenuHead(l.tokens[l.tokens.length - 1]);
+    const head = document.getElementById('token-menu-head').textContent;
+    const c1 = duplicateMenuToken();
+    state.menuTargetTokenIndex = l.tokens.indexOf(c1);
+    const c2 = duplicateMenuToken();
+    state.menuTargetTokenIndex = l.tokens.indexOf(c2);
+    document.querySelector('#token-menu [data-action="token-back"]').click();
+    const r = { head, names: [c1.name, c2.name], hp: c1.hp, back: l.tokens[0].id === c2.id };
+    l.tokens = l.tokens.filter(t => ![95, c1.id, c2.id].includes(t.id));
+    return r;
+  }, PNG);
+  assert.deepStrictEqual(menu, { head: 'Гоблин❤️ 3/7  ·  🛡 КД 15', names: ['Гоблин 2', 'Гоблин 3'], hp: 7, back: true });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
