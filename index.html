@@ -654,6 +654,8 @@ const state = {
     ],
     imageCache: new Map(),
     isDraggingToken: false,
+    dragOrigin: null,               // where the dragged token started (movement distance)
+    moveUsed: {},                   // feet moved this turn, per token id (reset when its turn starts)
     isPanningMap: false,
     draggedTokenIndex: null,
     startX: 0,
@@ -1186,6 +1188,7 @@ async function drawCanvas() {
         drawWalls(loc, z, ox, oy);
         drawFogOfWar(loc.fog, z, ox, oy);
         if (!isPlayer) drawRuler(z, ox, oy);
+        if (!isPlayer) drawMoveDistance(z, ox, oy);
         drawTemplate(z, ox, oy);
         drawPings(z, ox, oy);
         if (!isPlayer) {
@@ -1651,6 +1654,43 @@ function drawRuler(z, ox, oy) {
     ctx.restore();
 }
 
+// ============================================================
+//  MOVEMENT — distance of the current drag plus what the token already moved this turn
+// ============================================================
+// D&D 5e: on squares a diagonal costs one cell; on hexes count hexes; without a grid measure straight
+function moveDistanceFt(a, b) {
+    if (state.isGridEnabled && state.gridType === 'hex') return hexDistance(pixelToHex(a.x, a.y), pixelToHex(b.x, b.y)) * 5;
+    const cell = state.cellSize || 50;
+    if (state.isGridEnabled) return Math.round(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / cell) * 5;
+    return Math.round(Math.hypot(b.x - a.x, b.y - a.y) / cell * 5);
+}
+function inInitiative(id) { return state.initiative.combatants.some(c => c.tokenRef === id); }
+function drawMoveDistance(z, ox, oy) {
+    const o = state.dragOrigin, loc = getCurrentLocation();
+    if (!state.isDraggingToken || !o || !loc) return;
+    const t = loc.tokens[state.draggedTokenIndex]; if (!t || t.id !== o.id) return;
+    const d = moveDistanceFt(o, t);
+    if (!d) return;
+    const used = inInitiative(t.id) ? (state.moveUsed[t.id] || 0) : 0;
+    const total = used + d;
+    const over = Number.isFinite(t.speed) && t.speed > 0 && total > t.speed;
+    const color = over ? '#ff5252' : '#81c784';
+    const sx = o.x * z + ox, sy = o.y * z + oy, ex = t.x * z + ox, ey = t.y * z + oy;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    let text = `${d} фт`;
+    if (Number.isFinite(t.speed) && t.speed > 0) text = `${used ? used + ' + ' : ''}${d} / ${t.speed} фт${over ? ' — больше скорости!' : ''}`;
+    else if (used) text = `${used} + ${d} = ${total} фт`;
+    ctx.font = `bold ${Math.max(12, 14 * z)}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'black'; ctx.fillStyle = color;
+    const ty = ey - t.radius * z - 22;
+    ctx.strokeText(text, ex, ty); ctx.fillText(text, ex, ty);
+    ctx.restore();
+}
+
 const TPL_NAMES = { cone: 'Конус', sphere: 'Сфера', line: 'Линия', cube: 'Куб' };
 function drawTemplate(z, ox, oy) {
     if (!state.tplStart || !state.tplEnd) return;
@@ -1861,6 +1901,7 @@ canvas.addEventListener('pointerdown', (e) => {
                 const t = loc.tokens[i];
                 if (Math.hypot(cx - (t.x * z + ox), cy - (t.y * z + oy)) <= t.radius * z) {
                     state.isDraggingToken = true; state.draggedTokenIndex = i;
+                    state.dragOrigin = { x: t.x, y: t.y, id: t.id };
                     canvas.style.cursor = 'move'; return;
                 }
             }
@@ -1967,7 +2008,15 @@ function onPointerRelease(e) {
             state.isDrawingFog = false; state.fogRectStart = null; state.fogRectPreview = null; drawCanvas();
         }
     }
-    if (state.isDraggingToken) { state.isDraggingToken = false; state.draggedTokenIndex = null; pushHistory(); }
+    if (state.isDraggingToken) {
+        const cur = getCurrentLocation();
+        const tok = cur && cur.tokens[state.draggedTokenIndex], o = state.dragOrigin;
+        if (tok && o && o.id === tok.id && inInitiative(tok.id)) {
+            const d = moveDistanceFt(o, tok);
+            if (d > 0) state.moveUsed[tok.id] = (state.moveUsed[tok.id] || 0) + d;
+        }
+        state.isDraggingToken = false; state.draggedTokenIndex = null; state.dragOrigin = null; pushHistory(); drawCanvas();
+    }
     if (state.isPanningMap) { state.isPanningMap = false; syncCurrentLocationState(); }
     canvas.style.cursor = 'default';
 }
@@ -2677,6 +2726,7 @@ document.getElementById('init-next-btn').addEventListener('click', () => {
     }
     const active = state.initiative.combatants[state.initiative.currentIndex];
     const token = loc && active ? loc.tokens.find(t => t.id === active.tokenRef) : null;
+    if (active) delete state.moveUsed[active.tokenRef];
     const expired = tickStatusDurations(token);
     if (token && token.statusRounds && Object.keys(token.statusRounds).length + expired.length) pushHistory();
     if (expired.length) showToast(`${token.name || 'Токен'}: закончилось ${expired.join(' ')}`);
