@@ -297,6 +297,21 @@
                     <button class="tree-btn" id="tpl-clear-btn" style="margin-top:8px;width:100%;">✖ Убрать шаблон</button>
                 </div>
             </div>
+
+            <div class="mode-container">
+                <button class="mode-btn" id="btn-mode-walls" data-mode="walls" title="Стены, двери и освещение (W)">🧱 Стены</button>
+                <div class="drawing-popup" id="walls-menu-popup">
+                    <div class="popup-title">Освещение локации</div>
+                    <button class="tree-btn" id="lighting-toggle-btn" style="width:100%;">🌙 Темнота: выкл</button>
+                    <div class="popup-title" id="dm-dark-text">Темнота у мастера: 60%</div>
+                    <input type="range" class="size-slider" id="dm-dark-slider" min="0" max="95" value="60">
+                    <div style="font-size:11px;color:#888;margin-top:8px;line-height:1.5;">
+                        Клик — точка стены, двойной клик или Enter — закончить, Esc — отменить.<br>
+                        ПКМ по стене — дверь, открыть/закрыть, удалить.<br>
+                        Источник света — поле «Свет» в панели токена. Игроки видят только освещённое.
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="right-block">
@@ -396,6 +411,10 @@
                         </div>
                     </div>
                     <div class="props-field">
+                        <label for="prop-light">Свет (радиус, фт)</label>
+                        <input id="prop-light" type="number" min="0" max="600" step="5" placeholder="0 — не светит (факел 40, фонарь 60)">
+                    </div>
+                    <div class="props-field">
                         <label>Статусы</label>
                         <div class="props-status-grid" id="props-status-grid"></div>
                         <div id="props-status-durations"></div>
@@ -454,6 +473,12 @@
         <li data-action="hp-minus5" style="color:#ff9090;">💔 −5 HP</li>
         <li data-action="copy-token">⎘ Копировать</li>
         <li data-action="delete-token" style="color: var(--accent-color);">❌ Удалить токен</li>
+    </ul>
+
+    <ul class="ctx-menu-list" id="wall-ctx-menu">
+        <li data-action="toggle-door">🚪 Дверь ⇄ стена</li>
+        <li data-action="toggle-open">🔓 Открыть / закрыть дверь</li>
+        <li data-action="delete-wall" style="color: var(--accent-color);">❌ Удалить стену</li>
     </ul>
 
     <ul class="ctx-menu-list" id="fog-ctx-menu">
@@ -527,7 +552,7 @@ function showInlinePrompt(label, defaultVal, onConfirm) {
 // ============================================================
 const state = {
     adventureData: {
-        locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50 }],
+        locations: [{ id: 1, name: "Стартовая локация", bgData: null, tokens: [], drawings: [], fog: [], walls: [], lighting: 'off', zoomLevel: 1.0, offsetX: 50, offsetY: 50 }],
         currentLocationId: 1,
         library: [
             { id: 102, name: "Токены NPC", type: 'folder', collapsed: false, children: [] }
@@ -602,6 +627,11 @@ const state = {
     tplStart: null,
     tplEnd: null,
     tplDragging: false,
+    // Walls & lighting
+    wallPoints: [],                 // wall being drawn
+    _wallMouse: null,
+    menuTargetWallIndex: null,
+    dmDarkAlpha: 0.6,               // how dark unlit areas look to the DM (players always get full darkness)
     // Hotkeys
     _spaceDown: false,
     _prevMode: null,
@@ -659,6 +689,7 @@ function loadViewFromLocation(loc) {
     state.cellSize  = loc.cellSize  || 50;
     state.gridType  = loc.gridType === 'hex' ? 'hex' : 'square';
     updateGridTypeUI();
+    updateLightingUI();
     const inp = document.getElementById('cell-size-input');
     if (inp) inp.value = state.cellSize;
 }
@@ -671,7 +702,7 @@ function setCurrentLocationId(id) {
     emit('zoom:change', state.zoomLevel); emit('locations:update'); emit('canvas:redraw');
 }
 function addLocation(name) {
-    const loc = { id: Date.now(), name, bgData: null, tokens: [], drawings: [], fog: [], zoomLevel: 1.0, offsetX: 50, offsetY: 50, cellSize: 50 };
+    const loc = { id: Date.now(), name, bgData: null, tokens: [], drawings: [], fog: [], walls: [], lighting: 'off', zoomLevel: 1.0, offsetX: 50, offsetY: 50, cellSize: 50 };
     state.adventureData.locations.push(loc);
     emit('locations:update');
 }
@@ -781,7 +812,7 @@ function deleteSelectedFog() {
 let _srcPool = [];
 const _srcIndex = new Map();
 function snapshotLocation(loc) {
-    return JSON.stringify({ tokens: loc.tokens, drawings: loc.drawings, fog: loc.fog }, (k, v) => {
+    return JSON.stringify({ tokens: loc.tokens, drawings: loc.drawings, fog: loc.fog, walls: loc.walls || [] }, (k, v) => {
         if (k === 'src' && typeof v === 'string') {
             let i = _srcIndex.get(v);
             if (i === undefined) { i = _srcPool.length; _srcPool.push(v); _srcIndex.set(v, i); }
@@ -818,7 +849,7 @@ function restoreHistory(snap) {
     const loc = getCurrentLocation();
     if (!loc || !snap) return;
     const data = JSON.parse(snap, (k, v) => (typeof v === 'string' && v.startsWith('@@src:')) ? _srcPool[+v.slice(6)] : v);
-    loc.tokens = data.tokens; loc.drawings = data.drawings; loc.fog = data.fog;
+    loc.tokens = data.tokens; loc.drawings = data.drawings; loc.fog = data.fog; loc.walls = data.walls || [];
     updateUndoRedoButtons();
     markDirty();
     emit('canvas:redraw');
@@ -879,13 +910,19 @@ function normalizeAdventure(raw) {
             ...t,
             id: t.id ?? (Date.now() + j + Math.random()),
             x: num(t.x, 0), y: num(t.y, 0), radius: num(t.radius, 25),
-            name: String(t.name ?? ''), rotation: num(t.rotation, 0),
+            name: String(t.name ?? ''), rotation: num(t.rotation, 0), light: Math.max(0, num(t.light, 0)),
             statuses: arr(t.statuses).map(String),
             statusRounds: Object.fromEntries(Object.entries((t.statusRounds && typeof t.statusRounds === 'object') ? t.statusRounds : {})
                 .filter(([, n]) => Number.isInteger(n) && n > 0)),
         })),
         drawings: arr(l.drawings).filter(d => d && Array.isArray(d.points)),
         fog: arr(l.fog).filter(a => a && Array.isArray(a.points)),
+        walls: arr(l.walls).filter(w => w && Array.isArray(w.points) && w.points.length >= 2).map((w, j) => ({
+            id: w.id ?? (Date.now() + j + Math.random()),
+            points: w.points.map(pt => ({ x: num(pt && pt.x, 0), y: num(pt && pt.y, 0) })),
+            door: !!w.door, open: !!w.open,
+        })),
+        lighting: l.lighting === 'dark' ? 'dark' : 'off',
         zoomLevel: num(l.zoomLevel, 1.0), offsetX: num(l.offsetX, 50), offsetY: num(l.offsetY, 50),
         cellSize: num(l.cellSize, 50),
         gridType: l.gridType === 'hex' ? 'hex' : 'square',
@@ -1007,6 +1044,8 @@ async function drawCanvas() {
         drawVectorDrawings(loc.drawings, z, ox, oy);
         await drawTokens(loc.tokens, z, ox, oy);
         drawInitiativeHighlight(loc.tokens, z, ox, oy);
+        drawLighting(loc, z, ox, oy);
+        drawWalls(loc, z, ox, oy);
         drawFogOfWar(loc.fog, z, ox, oy);
         if (!isPlayer) drawRuler(z, ox, oy);
         drawTemplate(z, ox, oy);
@@ -1040,6 +1079,106 @@ async function drawCanvas() {
 function drawFallback(name) {
     ctx.fillStyle = "#444"; ctx.font = "16px Arial"; ctx.textAlign = "center";
     ctx.fillText(`📍 Локация без карты: ${name}`, canvas.width / 2, canvas.height / 2);
+}
+
+// ---- Walls & dynamic lighting ----
+// Segments that block light: every wall, and doors only while closed
+function blockingSegments(loc) {
+    const segs = [];
+    (loc.walls || []).forEach(w => {
+        if (w.door && w.open) return;
+        for (let i = 0; i < w.points.length - 1; i++) segs.push([w.points[i], w.points[i + 1]]);
+    });
+    return segs;
+}
+// Visibility polygon of a light at (cx,cy) with radius R: rays toward every wall endpoint (±ε) plus a ring of rays for the circle
+function visibilityPolygon(cx, cy, R, segs) {
+    const angles = [];
+    for (let i = 0; i < 72; i++) angles.push(-Math.PI + i * Math.PI / 36);   // same range as atan2 so sorting keeps the polygon in order
+    segs.forEach(([a, b]) => [a, b].forEach(pt => {
+        if (Math.hypot(pt.x - cx, pt.y - cy) > R * 1.5) return;
+        const ang = Math.atan2(pt.y - cy, pt.x - cx);
+        angles.push(ang - 1e-4, ang, ang + 1e-4);
+    }));
+    angles.sort((a, b) => a - b);
+    return angles.map(ang => {
+        const dx = Math.cos(ang), dy = Math.sin(ang);
+        let tMin = R;
+        for (const [p1, p2] of segs) {
+            const sx = p2.x - p1.x, sy = p2.y - p1.y;
+            const denom = dx * sy - dy * sx;
+            if (Math.abs(denom) < 1e-9) continue;
+            const wx = p1.x - cx, wy = p1.y - cy;
+            const t = (wx * sy - wy * sx) / denom;
+            const u = (wx * dy - wy * dx) / denom;
+            if (t > 0 && u >= 0 && u <= 1 && t < tMin) tMin = t;
+        }
+        return { x: cx + dx * tMin, y: cy + dy * tMin };
+    });
+}
+const _lightCanvas = document.createElement('canvas');
+function drawLighting(loc, z, ox, oy) {
+    if (loc.lighting !== 'dark') return;
+    const alpha = isPlayer ? 1 : state.dmDarkAlpha;
+    if (alpha <= 0) return;
+    _lightCanvas.width = canvas.width; _lightCanvas.height = canvas.height;
+    const lc = _lightCanvas.getContext('2d');
+    lc.fillStyle = `rgba(0,0,0,${alpha})`;
+    lc.fillRect(0, 0, canvas.width, canvas.height);
+    lc.globalCompositeOperation = 'destination-out';
+    const segs = blockingSegments(loc);
+    loc.tokens.forEach(t => {
+        if (!(t.light > 0)) return;
+        const R = t.light / 5 * state.cellSize;
+        const poly = visibilityPolygon(t.x, t.y, R, segs);
+        const sx = t.x * z + ox, sy = t.y * z + oy;
+        const grad = lc.createRadialGradient(sx, sy, 0, sx, sy, R * z);
+        grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(0.5, 'rgba(0,0,0,1)');   // bright half, then dim falloff
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        lc.fillStyle = grad;
+        lc.beginPath();
+        poly.forEach((p, i) => { const px = p.x * z + ox, py = p.y * z + oy; if (i) lc.lineTo(px, py); else lc.moveTo(px, py); });
+        lc.closePath(); lc.fill();
+    });
+    ctx.drawImage(_lightCanvas, 0, 0);
+}
+const wallsVisible = (loc) => !isPlayer && (state.currentMode === 'walls' || loc.lighting === 'dark');
+function drawWalls(loc, z, ox, oy) {
+    if (!wallsVisible(loc)) return;
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    (loc.walls || []).forEach(w => {
+        ctx.beginPath();
+        w.points.forEach((p, i) => { const px = p.x * z + ox, py = p.y * z + oy; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+        ctx.strokeStyle = w.door ? '#8bc34a' : '#ff9d4a';
+        ctx.lineWidth = w.door ? 5 : 3;
+        ctx.setLineDash(w.door && w.open ? [6, 6] : []);
+        ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    const pts = state.wallPoints;
+    if (state.currentMode === 'walls' && pts.length) {
+        ctx.beginPath();
+        pts.forEach((p, i) => { const px = p.x * z + ox, py = p.y * z + oy; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+        if (state._wallMouse) ctx.lineTo(state._wallMouse.x * z + ox, state._wallMouse.y * z + oy);
+        ctx.strokeStyle = 'rgba(255,157,74,0.8)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+        pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x * z + ox, p.y * z + oy, 4, 0, Math.PI * 2); ctx.fillStyle = '#ffd166'; ctx.fill(); });
+    }
+    ctx.restore();
+}
+function commitWall() {
+    const loc = getCurrentLocation();
+    if (loc && state.wallPoints.length >= 2) {
+        if (!loc.walls) loc.walls = [];
+        loc.walls.push({ id: Date.now() + Math.random(), points: state.wallPoints.map(p => ({ ...p })), door: false, open: false });
+        pushHistory();
+    }
+    state.wallPoints = []; state._wallMouse = null; drawCanvas();
+}
+// Distance from a point to segment ab (map units)
+function distToSegment(px, py, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / len2)) : 0;
+    return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
 }
 
 // ---- Hex grid (pointy-top, axial coords). Neighbouring hex centres are cellSize apart (= 5 ft). ----
@@ -1543,6 +1682,13 @@ canvas.addEventListener('pointerdown', (e) => {
         if (state.currentMode === 'ruler') {
             state.rulerStartPoint = { x: mx, y: my }; state.rulerEndPoint = { x: mx, y: my }; return;
         }
+        if (state.currentMode === 'walls') {
+            let pt = { x: mx, y: my };
+            if (state.isGridEnabled && state.gridType !== 'hex') pt = snapToGrid(mx, my);   // snap to cell corners
+            const last = state.wallPoints[state.wallPoints.length - 1];
+            if (!last || Math.hypot(last.x - pt.x, last.y - pt.y) > 1) state.wallPoints.push(pt);
+            drawCanvas(); return;
+        }
         if (state.currentMode === 'template') {
             state.tplStart = { x: mx, y: my }; state.tplEnd = { x: mx + 1, y: my };
             state.tplDragging = true; drawCanvas(); return;
@@ -1602,6 +1748,7 @@ canvas.addEventListener('pointermove', (e) => {
         }
     }
     if (state.currentMode === 'ruler' && state.rulerStartPoint) { state.rulerEndPoint = { x: mx, y: my }; drawCanvas(); return; }
+    if (state.currentMode === 'walls' && state.wallPoints.length) { state._wallMouse = { x: mx, y: my }; drawCanvas(); return; }
     if (state.currentMode === 'template' && state.tplDragging) { state.tplEnd = { x: mx, y: my }; drawCanvas(); return; }
     if (state.isDraggingToken && state.draggedTokenIndex !== null && loc.tokens[state.draggedTokenIndex]) {
         let nx = mx, ny = my;
@@ -1699,6 +1846,20 @@ canvas.addEventListener('contextmenu', (e) => {
             return;
         }
     }
+    if (wallsVisible(loc)) {
+        const walls = loc.walls || [];
+        for (let i = walls.length - 1; i >= 0; i--) {
+            const pts = walls[i].points;
+            for (let j = 0; j < pts.length - 1; j++) {
+                if (distToSegment(mx, my, pts[j], pts[j + 1]) < 8 / z) {
+                    state.menuTargetWallIndex = i;
+                    const m = document.getElementById('wall-ctx-menu');
+                    m.style.display = 'block'; m.style.left = `${e.pageX}px`; m.style.top = `${e.pageY}px`;
+                    return;
+                }
+            }
+        }
+    }
     if (loc.fog) {
         for (let i = loc.fog.length - 1; i >= 0; i--) {
             const area = loc.fog[i];
@@ -1715,6 +1876,7 @@ canvas.addEventListener('contextmenu', (e) => {
 function hideAllContextMenus() {
     document.getElementById('token-menu').style.display = 'none';
     document.getElementById('fog-ctx-menu').style.display = 'none';
+    document.getElementById('wall-ctx-menu').style.display = 'none';
 }
 
 // Universal fog hit detection — works for brush, polygon and rect
@@ -1780,6 +1942,21 @@ document.getElementById('token-menu-initiative').addEventListener('click', (e) =
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.querySelector('[data-tab="initiative"]').classList.add('active');
         document.getElementById('tab-initiative').classList.add('active');
+    }
+    hideAllContextMenus();
+});
+
+document.getElementById('wall-ctx-menu').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const li = e.target.closest('li[data-action]');
+    const loc = getCurrentLocation();
+    const w = loc && loc.walls ? loc.walls[state.menuTargetWallIndex] : null;
+    if (li && w) {
+        if (li.dataset.action === 'toggle-door') { w.door = !w.door; w.open = false; }
+        if (li.dataset.action === 'toggle-open' && w.door) w.open = !w.open;
+        if (li.dataset.action === 'delete-wall') loc.walls.splice(state.menuTargetWallIndex, 1);
+        state.menuTargetWallIndex = null;
+        pushHistory(); drawCanvas();
     }
     hideAllContextMenus();
 });
@@ -1859,6 +2036,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
         document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
         document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
         document.getElementById('tpl-menu-popup').classList.toggle('show', mode === 'template');
+        document.getElementById('walls-menu-popup').classList.toggle('show', mode === 'walls');
         if (mode !== 'ruler') { state.rulerStartPoint = null; state.rulerEndPoint = null; drawCanvas(); }
     });
 });
@@ -1881,7 +2059,7 @@ document.querySelectorAll('.mode-container').forEach(container => {
         const btn = container.querySelector('.mode-btn');
         if (!btn) return;
         const mode = btn.dataset.mode;
-        if (state.currentMode === mode && (mode === 'draw' || mode === 'fog' || mode === 'template')) {
+        if (state.currentMode === mode && (mode === 'draw' || mode === 'fog' || mode === 'template' || mode === 'walls')) {
             container.querySelector('.drawing-popup')?.classList.add('show');
         }
     });
@@ -1898,6 +2076,7 @@ document.addEventListener('keydown', (e) => {
         if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length > 0) {
             state.fogPolygonPoints = []; state._polyMousePos = null; drawCanvas(); return;
         }
+        if (state.wallPoints.length) { state.wallPoints = []; state._wallMouse = null; drawCanvas(); return; }
         if (state.tplStart) { state.tplStart = state.tplEnd = null; state.tplDragging = false; drawCanvas(); return; }
         // Deselect tokens
         if (state.selectedTokenIds.size > 0) {
@@ -2484,6 +2663,8 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'r' || e.key === 'R') { activateMode('ruler'); return; }
     if (e.key === 'd' || e.key === 'D') { activateMode('draw'); return; }
     if (e.key === 't' || e.key === 'T') { activateMode('template'); return; }
+    if (e.key === 'w' || e.key === 'W') { activateMode('walls'); return; }
+    if (e.key === 'Enter' && state.currentMode === 'walls' && state.wallPoints.length) { commitWall(); return; }
 });
 
 // Space-hold = temporary pan tool (Hand tool)
@@ -2512,6 +2693,7 @@ function activateMode(mode) {
     document.getElementById('drawing-menu').classList.toggle('show', mode === 'draw');
     document.getElementById('fog-menu-popup').classList.toggle('show', mode === 'fog');
     document.getElementById('tpl-menu-popup').classList.toggle('show', mode === 'template');
+    document.getElementById('walls-menu-popup').classList.toggle('show', mode === 'walls');
     if (mode !== 'ruler') { state.rulerStartPoint = null; state.rulerEndPoint = null; }
     drawCanvas();
 }
@@ -2682,6 +2864,12 @@ function initPropsPanel() {
             renderInitiative(); emit('canvas:redraw');
         }, 300);
     });
+    document.getElementById('prop-light').addEventListener('change', () => {
+        const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
+        const t = loc.tokens.find(t => t.id === _propsTargetId); if (!t) return;
+        t.light = Math.max(0, parseInt(document.getElementById('prop-light').value) || 0);
+        pushHistory(); emit('canvas:redraw');
+    });
     document.getElementById('prop-maxhp').addEventListener('input', () => {
         clearTimeout(_maxHpTimer); _maxHpTimer = setTimeout(() => {
             const loc = getCurrentLocation(); if (!loc || !_propsTargetId) return;
@@ -2693,6 +2881,7 @@ function initPropsPanel() {
 
     // Double-click on a token (in move or select mode) opens the props panel
     canvas.addEventListener('dblclick', (e) => {
+        if (state.currentMode === 'walls') { e.preventDefault(); commitWall(); return; }
         if (state.currentMode === 'fog' && state.currentFogMode === 'polygon' && state.fogPolygonPoints.length >= 3) {
             e.preventDefault(); const loc = getCurrentLocation(); if (loc) commitPolygonFog(loc);
             return;
@@ -2740,6 +2929,7 @@ function refreshPropsPanel() {
     document.getElementById('prop-name').value = t.name || '';
     document.getElementById('prop-hp').value = t.hp !== undefined && t.hp !== '' ? t.hp : '';
     document.getElementById('prop-maxhp').value = t.maxHp || '';
+    document.getElementById('prop-light').value = t.light || '';
 
     const mul = (t.radius || 25) / 25;
     document.querySelectorAll('.props-size-btn').forEach(b => {
@@ -2775,6 +2965,26 @@ document.getElementById('load-map-btn').addEventListener('click', () => document
 document.getElementById('load-map-file').addEventListener('change', (e) => {
     const file = e.target.files[0]; e.target.value = '';
     if (file) compressImageFile(file, 1600, (data) => setCurrentBackground(data));
+});
+
+// Walls popup: darkness toggle per location + how dark it looks to the DM
+function updateLightingUI() {
+    const b = document.getElementById('lighting-toggle-btn'); if (!b) return;
+    const loc = getCurrentLocation();
+    const dark = loc && loc.lighting === 'dark';
+    b.textContent = dark ? '🌙 Темнота: вкл' : '🌙 Темнота: выкл';
+    b.style.background = dark ? '#2e5cb8' : '';
+}
+document.getElementById('lighting-toggle-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const loc = getCurrentLocation(); if (!loc) return;
+    loc.lighting = loc.lighting === 'dark' ? 'off' : 'dark';
+    updateLightingUI(); markDirty(); drawCanvas();
+});
+document.getElementById('dm-dark-slider').addEventListener('input', (e) => {
+    state.dmDarkAlpha = parseInt(e.target.value) / 100;
+    document.getElementById('dm-dark-text').textContent = `Темнота у мастера: ${e.target.value}%`;
+    drawCanvas();
 });
 
 // ============================================================
@@ -2840,6 +3050,7 @@ function broadcastState() {
     const msg = {
         type: 'state', locId: loc.id, locName: loc.name, bgSig, tokens,
         drawings: loc.drawings, fog: (loc.fog || []).filter(a => !a.hidden),
+        walls: loc.walls || [], lighting: loc.lighting || 'off',
         grid: { on: state.isGridEnabled, opacity: state.gridOpacity, color: state.gridColor, cell: state.cellSize, type: state.gridType },
         init: { ids: state.initiative.combatants.map(c => c.tokenRef), idx: state.initiative.currentIndex },
     };
@@ -2878,7 +3089,7 @@ if (isPlayer) {
             if (t.src !== undefined) playerSrc.set(String(t.id), t.src);
             return { ...t, src: t.src !== undefined ? t.src : playerSrc.get(String(t.id)) };
         });
-        state.adventureData = { locations: [{ id: m.locId, name: m.locName, bgData: playerBg, tokens, drawings: m.drawings, fog: m.fog }], currentLocationId: m.locId, library: [] };
+        state.adventureData = { locations: [{ id: m.locId, name: m.locName, bgData: playerBg, tokens, drawings: m.drawings, fog: m.fog, walls: m.walls || [], lighting: m.lighting }], currentLocationId: m.locId, library: [] };
         state.isGridEnabled = m.grid.on; state.gridOpacity = m.grid.opacity; state.gridColor = m.grid.color; state.cellSize = m.grid.cell; state.gridType = m.grid.type;
         state.initiative = { combatants: m.init.ids.map(id => ({ tokenRef: id })), currentIndex: m.init.idx, round: 1 };
         drawCanvas();
