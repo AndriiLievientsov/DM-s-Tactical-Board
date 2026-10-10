@@ -198,6 +198,7 @@
                 <button class="grid-toggle-btn" id="grid-toggle">🌐 Сетка</button>
                 <input type="range" class="grid-opacity-slider" id="grid-opacity" min="5" max="100" value="40">
                 <button class="grid-toggle-btn" id="grid-color-toggle">🎨 Белая</button>
+                <button class="grid-toggle-btn" id="grid-type-toggle" title="Вид сетки для текущей локации: квадраты или гексы">▦ Квадраты</button>
             </div>
 
             <div class="controls-group">
@@ -540,6 +541,7 @@ const state = {
     isGridEnabled: false,
     gridOpacity: 0.4,
     gridColor: 'white',
+    gridType: 'square',             // 'square' | 'hex' (per location)
     rulerSize: 24,
     currentBrushColor: '#ff4a4a',
     currentBrushSize: 6,
@@ -646,7 +648,7 @@ function toggleGridColor() {
 function setCurrentMode(mode) { state.currentMode = mode; emit('mode:change', mode); }
 function syncCurrentLocationState() {
     const loc = getCurrentLocation();
-    if (loc) { loc.zoomLevel = state.zoomLevel; loc.offsetX = state.offsetX; loc.offsetY = state.offsetY; loc.cellSize = state.cellSize; }
+    if (loc) { loc.zoomLevel = state.zoomLevel; loc.offsetX = state.offsetX; loc.offsetY = state.offsetY; loc.cellSize = state.cellSize; loc.gridType = state.gridType; }
 }
 // Apply a location's saved view (zoom / pan / cell size) to the live state
 function loadViewFromLocation(loc) {
@@ -655,6 +657,8 @@ function loadViewFromLocation(loc) {
     state.offsetX   = loc.offsetX   !== undefined ? loc.offsetX   : 50;
     state.offsetY   = loc.offsetY   !== undefined ? loc.offsetY   : 50;
     state.cellSize  = loc.cellSize  || 50;
+    state.gridType  = loc.gridType === 'hex' ? 'hex' : 'square';
+    updateGridTypeUI();
     const inp = document.getElementById('cell-size-input');
     if (inp) inp.value = state.cellSize;
 }
@@ -884,6 +888,7 @@ function normalizeAdventure(raw) {
         fog: arr(l.fog).filter(a => a && Array.isArray(a.points)),
         zoomLevel: num(l.zoomLevel, 1.0), offsetX: num(l.offsetX, 50), offsetY: num(l.offsetY, 50),
         cellSize: num(l.cellSize, 50),
+        gridType: l.gridType === 'hex' ? 'hex' : 'square',
     }));
     if (!locations.length) throw new Error('Нет ни одной локации');
     const library = arr(raw.library).filter(f => f && typeof f === 'object').map((f, i) => ({
@@ -1008,7 +1013,7 @@ async function drawCanvas() {
         drawPings(z, ox, oy);
         if (!isPlayer) {
             drawSelectionOverlay(z, ox, oy);
-            drawDynamicRulers(mw, mh, z, ox, oy);
+            if (state.gridType !== 'hex') drawDynamicRulers(mw, mh, z, ox, oy);
         }
     };
 
@@ -1037,7 +1042,53 @@ function drawFallback(name) {
     ctx.fillText(`📍 Локация без карты: ${name}`, canvas.width / 2, canvas.height / 2);
 }
 
+// ---- Hex grid (pointy-top, axial coords). Neighbouring hex centres are cellSize apart (= 5 ft). ----
+const SQRT3 = Math.sqrt(3);
+const hexRadius = () => state.cellSize / SQRT3;
+function hexToPixel(q, r) { const R = hexRadius(); return { x: R * SQRT3 * (q + r / 2), y: R * 1.5 * r }; }
+function pixelToHex(x, y) {
+    const R = hexRadius();
+    const qf = (SQRT3 / 3 * x - y / 3) / R, rf = (2 / 3 * y) / R, sf = -qf - rf;
+    let q = Math.round(qf), r = Math.round(rf); const sr = Math.round(sf);
+    const dq = Math.abs(q - qf), dr = Math.abs(r - rf), ds = Math.abs(sr - sf);
+    if (dq > dr && dq > ds) q = -r - sr; else if (dr > ds) r = -q - sr;
+    return { q, r };
+}
+const hexDistance = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.q + a.r - b.q - b.r)) / 2;
+// Snap a map point to the nearest grid point: hex centre, or square grid intersection
+function snapToGrid(x, y) {
+    if (state.gridType === 'hex') { const h = pixelToHex(x, y); return hexToPixel(h.q, h.r); }
+    const cs = state.cellSize;
+    return { x: Math.round(x / cs) * cs, y: Math.round(y / cs) * cs };
+}
+function drawHexGrid(z, ox, oy) {
+    const R = hexRadius();
+    // visible map-space rectangle
+    const x0 = -ox / z, y0 = -oy / z, x1 = (canvas.width - ox) / z, y1 = (canvas.height - oy) / z;
+    const rMin = Math.floor(y0 / (1.5 * R)) - 1, rMax = Math.ceil(y1 / (1.5 * R)) + 1;
+    ctx.beginPath();
+    for (let r = rMin; r <= rMax; r++) {
+        const qMin = Math.floor(x0 / (R * SQRT3) - r / 2) - 1, qMax = Math.ceil(x1 / (R * SQRT3) - r / 2) + 1;
+        for (let q = qMin; q <= qMax; q++) {
+            const c = hexToPixel(q, r);
+            for (let i = 0; i < 6; i++) {
+                const a = Math.PI / 180 * (60 * i - 30);
+                const px = (c.x + R * Math.cos(a)) * z + ox, py = (c.y + R * Math.sin(a)) * z + oy;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+    }
+    ctx.stroke();
+}
+
 function drawTacticalGrid(mw, mh, z, ox, oy) {
+    if (state.gridType === 'hex') {
+        ctx.save();
+        ctx.strokeStyle = state.gridColor === 'white' ? `rgba(255,255,255,${state.gridOpacity})` : `rgba(0,0,0,${state.gridOpacity})`;
+        ctx.lineWidth = 1; drawHexGrid(z, ox, oy); ctx.restore();
+        return;
+    }
     const sc = state.cellSize * z;
     const sx = ox % sc, sy = oy % sc;
     ctx.save();
@@ -1283,11 +1334,13 @@ function drawRuler(z, ox, oy) {
     ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
     ctx.setLineDash([]);
     const dist = Math.hypot(state.rulerEndPoint.x - state.rulerStartPoint.x, state.rulerEndPoint.y - state.rulerStartPoint.y);
-    const feet = (dist / state.cellSize) * 5;
-    const cells = dist / state.cellSize;
+    const cells = state.gridType === 'hex'
+        ? hexDistance(pixelToHex(state.rulerStartPoint.x, state.rulerStartPoint.y), pixelToHex(state.rulerEndPoint.x, state.rulerEndPoint.y))
+        : dist / state.cellSize;
+    const feet = cells * 5;
     const feetRound = feet % 1 === 0 ? feet : feet.toFixed(1);
     const cellsRound = cells % 1 === 0 ? cells : cells.toFixed(1);
-    const text = `${feetRound} фт. / ${cellsRound} кл.`;
+    const text = `${feetRound} фт. / ${cellsRound} ${state.gridType === 'hex' ? 'гекс.' : 'кл.'}`;
     ctx.font = `bold ${Math.max(12, 16 * z)}px 'Segoe UI', sans-serif`;
     ctx.fillStyle = '#29b6f6'; ctx.strokeStyle = 'black'; ctx.lineWidth = 4;
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
@@ -1552,11 +1605,7 @@ canvas.addEventListener('pointermove', (e) => {
     if (state.currentMode === 'template' && state.tplDragging) { state.tplEnd = { x: mx, y: my }; drawCanvas(); return; }
     if (state.isDraggingToken && state.draggedTokenIndex !== null && loc.tokens[state.draggedTokenIndex]) {
         let nx = mx, ny = my;
-        if (state.isGridEnabled) {
-            const cs = state.cellSize;
-            nx = Math.round(mx / cs) * cs;
-            ny = Math.round(my / cs) * cs;
-        }
+        if (state.isGridEnabled) ({ x: nx, y: ny } = snapToGrid(mx, my));
         loc.tokens[state.draggedTokenIndex].x = nx;
         loc.tokens[state.draggedTokenIndex].y = ny;
         drawCanvas();
@@ -1790,6 +1839,14 @@ function updateZoomUI() { document.getElementById('zoom-text').innerText = `${Ma
 document.getElementById('grid-toggle').addEventListener('click', () => { toggleGrid(); document.getElementById('grid-toggle').classList.toggle('active', state.isGridEnabled); });
 document.getElementById('grid-opacity').addEventListener('input', (e) => { setGridOpacity(parseFloat(e.target.value)); });
 document.getElementById('grid-color-toggle').addEventListener('click', () => { toggleGridColor(); });
+function updateGridTypeUI() {
+    const b = document.getElementById('grid-type-toggle');
+    if (b) b.textContent = state.gridType === 'hex' ? '⬡ Гексы' : '▦ Квадраты';
+}
+document.getElementById('grid-type-toggle').addEventListener('click', () => {
+    state.gridType = state.gridType === 'hex' ? 'square' : 'hex';
+    syncCurrentLocationState(); updateGridTypeUI(); markDirty(); drawCanvas();
+});
 
 // Modes
 document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -2783,7 +2840,7 @@ function broadcastState() {
     const msg = {
         type: 'state', locId: loc.id, locName: loc.name, bgSig, tokens,
         drawings: loc.drawings, fog: (loc.fog || []).filter(a => !a.hidden),
-        grid: { on: state.isGridEnabled, opacity: state.gridOpacity, color: state.gridColor, cell: state.cellSize },
+        grid: { on: state.isGridEnabled, opacity: state.gridOpacity, color: state.gridColor, cell: state.cellSize, type: state.gridType },
         init: { ids: state.initiative.combatants.map(c => c.tokenRef), idx: state.initiative.currentIndex },
     };
     const sig = JSON.stringify(msg);
@@ -2822,7 +2879,7 @@ if (isPlayer) {
             return { ...t, src: t.src !== undefined ? t.src : playerSrc.get(String(t.id)) };
         });
         state.adventureData = { locations: [{ id: m.locId, name: m.locName, bgData: playerBg, tokens, drawings: m.drawings, fog: m.fog }], currentLocationId: m.locId, library: [] };
-        state.isGridEnabled = m.grid.on; state.gridOpacity = m.grid.opacity; state.gridColor = m.grid.color; state.cellSize = m.grid.cell;
+        state.isGridEnabled = m.grid.on; state.gridOpacity = m.grid.opacity; state.gridColor = m.grid.color; state.cellSize = m.grid.cell; state.gridType = m.grid.type;
         state.initiative = { combatants: m.init.ids.map(id => ({ tokenRef: id })), currentIndex: m.init.idx, round: 1 };
         drawCanvas();
     };

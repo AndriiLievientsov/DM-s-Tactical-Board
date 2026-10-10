@@ -58,6 +58,18 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   }, PNG);
   assert.deepStrictEqual(dur, { after1: '["🔥","🛡️"]', after2: '["🛡️"]', rounds: '{}' });
 
+  // Hex grid: snapping lands on hex centres, ruler counts hexes, setting is per location
+  const hex = await page.evaluate(() => {
+    document.getElementById('grid-type-toggle').click();
+    const snapped = snapToGrid(37, 41);
+    const back = pixelToHex(snapped.x, snapped.y), c = hexToPixel(back.q, back.r);
+    const d = hexDistance(pixelToHex(0, 0), pixelToHex(hexToPixel(3, -1).x, hexToPixel(3, -1).y));
+    drawCanvas();
+    return { onCentre: Math.abs(c.x - snapped.x) < 1e-9 && Math.abs(c.y - snapped.y) < 1e-9, d, saved: getCurrentLocation().gridType };
+  });
+  assert.deepStrictEqual(hex, { onCentre: true, d: 3, saved: 'hex' });
+  await page.evaluate(() => document.getElementById('grid-type-toggle').click());
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
