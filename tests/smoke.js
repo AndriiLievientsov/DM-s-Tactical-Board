@@ -70,6 +70,22 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   assert.deepStrictEqual(hex, { onCentre: true, d: 3, saved: 'hex' });
   await page.evaluate(() => document.getElementById('grid-type-toggle').click());
 
+  // Stat block: AC/attacks are edited in the props panel, an attack rolls to-hit and damage
+  const sb = await page.evaluate(() => {
+    openPropsForToken(77);
+    const ac = document.getElementById('prop-ac'); ac.value = '15'; ac.dispatchEvent(new Event('change'));
+    document.getElementById('sb-add-attack').click();
+    const row = document.querySelector('#sb-attacks .sb-attack');
+    const set = (cls, v) => { const i = row.querySelector(cls); i.value = v; i.dispatchEvent(new Event('change')); };
+    set('.sb-name', 'Скимитар'); set('.sb-bonus', '+4'); set('.sb-dmg', '1d6+2');
+    const t = getCurrentLocation().tokens.find(t => t.id === 77);
+    const r = rollAttack(t, t.attacks[0]);
+    const okHit = r.hit === r.d20 + 4, okDmg = r.damage >= (r.crit ? 4 : 3) && r.damage <= (r.crit ? 14 : 8);
+    return { ac: t.ac, atk: JSON.stringify(t.attacks), okHit, okDmg, crit: critFormula('1d8+2d6+3'),
+             log: document.getElementById('sb-roll-log').textContent.includes('Скимитар') };
+  });
+  assert.deepStrictEqual(sb, { ac: 15, atk: '[{"name":"Скимитар","bonus":4,"damage":"1d6+2"}]', okHit: true, okDmg: true, crit: '2d8+4d6+3', log: true });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);

@@ -158,6 +158,13 @@
         .tpl-row { margin-top: 8px; }
         .status-dur-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: #ccc; }
         .status-dur-row span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sb-attack { display:flex; gap:4px; align-items:center; margin-bottom:5px; }
+        .props-field .sb-attack input { width:auto; min-width:0; background:#14141a; border:1px solid #383842; color:#e3e3e6; padding:4px 5px; border-radius:4px; font-size:12px; }
+        .props-field .sb-attack .sb-name { flex:2; } .props-field .sb-attack .sb-bonus { width:40px; flex:none; text-align:center; } .props-field .sb-attack .sb-dmg { flex:1.5; }
+        .sb-attack button { flex:none; background:#2a2a33; border:1px solid #383842; color:#ddd; border-radius:4px; cursor:pointer; padding:4px 6px; font-size:12px; }
+        .sb-attack button.sb-roll { background:#7b2fff; border-color:#9b5fff; color:#fff; }
+        #sb-roll-log { font-size:12px; color:#ccc; background:#14141a; border:1px solid #383842; border-radius:4px; padding:6px 8px; margin-top:6px; min-height:18px; white-space:pre-line; }
+        #sb-roll-log .crit { color:#ffd166; font-weight:bold; }
         .props-field .status-dur-row input { width: 90px; flex: none; background: #14141a; border: 1px solid var(--border-color); color: #ffd166; padding: 3px 6px; border-radius: 4px; font-size: 12px; text-align: center; }
         #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #2a2a32; border: 1px solid #ffd166; color: #ffd166; padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 2000; opacity: 0; transition: opacity .25s; pointer-events: none; }
         #toast.show { opacity: 1; }
@@ -399,6 +406,22 @@
                         <label>Статусы</label>
                         <div class="props-status-grid" id="props-status-grid"></div>
                         <div id="props-status-durations"></div>
+                    </div>
+                    <div class="props-row">
+                        <div class="props-field">
+                            <label>КД (AC)</label>
+                            <input id="prop-ac" type="number" placeholder="—" min="0" max="99">
+                        </div>
+                        <div class="props-field">
+                            <label>Скорость, фт</label>
+                            <input id="prop-speed" type="number" placeholder="30" min="0" max="999" step="5">
+                        </div>
+                    </div>
+                    <div class="props-field">
+                        <label>Атаки</label>
+                        <div id="sb-attacks"></div>
+                        <button class="tree-btn" id="sb-add-attack" style="width:100%">＋ Атака</button>
+                        <div id="sb-roll-log"></div>
                     </div>
                 </div>
             </div>
@@ -883,6 +906,10 @@ function normalizeAdventure(raw) {
             statuses: arr(t.statuses).map(String),
             statusRounds: Object.fromEntries(Object.entries((t.statusRounds && typeof t.statusRounds === 'object') ? t.statusRounds : {})
                 .filter(([, n]) => Number.isInteger(n) && n > 0)),
+            ac: Number.isFinite(t.ac) ? t.ac : undefined,
+            speed: Number.isFinite(t.speed) ? t.speed : undefined,
+            attacks: arr(t.attacks).filter(a => a && typeof a === 'object')
+                .map(a => ({ name: String(a.name ?? ''), bonus: parseInt(a.bonus) || 0, damage: String(a.damage ?? '') })),
         })),
         drawings: arr(l.drawings).filter(d => d && Array.isArray(d.points)),
         fog: arr(l.fog).filter(a => a && Array.isArray(a.points)),
@@ -2578,6 +2605,18 @@ function parseDiceFormula(formula) {
     return { total, detail: parts.join(' ') };
 }
 
+// Show a roll in the dice popup/history (used by the dice roller and stat-block attacks)
+function recordRoll(label, total, detail) {
+    document.getElementById('dice-result').innerText = `🎲 ${total}`;
+    document.getElementById('dice-detail').innerText = detail;
+    document.getElementById('dice-toggle-btn').innerText = `🎲 ${label}: ${total}`;
+    const history = document.getElementById('dice-history');
+    const li = document.createElement('li');
+    li.innerText = `${label} → ${total}`;
+    history.prepend(li);
+    while (history.children.length > 8) history.removeChild(history.lastChild);
+}
+
 function initDiceRoller() {
     const container = document.getElementById('dice-buttons');
     const result    = document.getElementById('dice-result');
@@ -2597,13 +2636,7 @@ function initDiceRoller() {
     const rollFormula = (formula) => {
         const res = parseDiceFormula(formula);
         if (!res) { result.innerText = '⚠️ Ошибка'; detail.innerText = 'Неверная формула'; return; }
-        result.innerText = `🎲 ${res.total}`;
-        detail.innerText = res.detail;
-        toggleBtn.innerText = `🎲 ${formula}: ${res.total}`;
-        const li = document.createElement('li');
-        li.innerText = `${formula} → ${res.total}`;
-        history.prepend(li);
-        while (history.children.length > 8) history.removeChild(history.lastChild);
+        recordRoll(formula, res.total, res.detail);
     };
 
     document.getElementById('dice-roll-formula').addEventListener('click', (e) => {
@@ -2768,6 +2801,81 @@ function refreshPropsPanel() {
         });
         row.appendChild(label); row.appendChild(input); durBox.appendChild(row);
     });
+
+    document.getElementById('prop-ac').value = Number.isFinite(t.ac) ? t.ac : '';
+    document.getElementById('prop-speed').value = Number.isFinite(t.speed) ? t.speed : '';
+    renderStatBlockAttacks(t);
+}
+
+// ============================================================
+//  STAT BLOCK — AC, speed and attacks; an attack rolls to-hit (d20 + bonus) and damage
+// ============================================================
+// Double the dice on a critical hit: "1d8+3" -> "2d8+3"
+function critFormula(formula) {
+    return String(formula).replace(/(\d*)d(\d+)/gi, (m, n, sides) => `${(parseInt(n || '1') * 2)}d${sides}`);
+}
+
+function rollAttack(t, a) {
+    const d20 = rollDie(20);
+    const bonus = parseInt(a.bonus) || 0;
+    const crit = d20 === 20, fumble = d20 === 1;
+    const dmg = a.damage ? parseDiceFormula(crit ? critFormula(a.damage) : a.damage) : null;
+    const hit = d20 + bonus;
+    const who = `${t.name || 'Токен'}: ${a.name || 'Атака'}`;
+    const lines = [
+        `${who}`,
+        `Попадание: ${hit} (d20 ${d20}${bonus ? (bonus > 0 ? ' + ' : ' − ') + Math.abs(bonus) : ''})${crit ? ' — КРИТ!' : fumble ? ' — промах (1)' : ''}`,
+    ];
+    if (dmg) lines.push(`Урон: ${dmg.total} (${dmg.detail})`);
+    else if (a.damage) lines.push('Урон: неверная формула');
+    const log = document.getElementById('sb-roll-log');
+    log.textContent = lines.join('\n');
+    log.classList.toggle('crit', crit);
+    recordRoll(who, hit + (dmg ? ` / ${dmg.total}` : ''), lines.slice(1).join('; '));
+    return { d20, hit, crit, damage: dmg ? dmg.total : null };
+}
+
+function renderStatBlockAttacks(t) {
+    const box = document.getElementById('sb-attacks');
+    box.innerHTML = '';
+    (t.attacks || []).forEach((a, i) => {
+        const row = document.createElement('div'); row.className = 'sb-attack';
+        const mk = (cls, ph, val, title) => {
+            const inp = document.createElement('input'); inp.type = 'text'; inp.className = cls;
+            inp.placeholder = ph; inp.value = val ?? ''; inp.title = title; inp.setAttribute('aria-label', title);
+            return inp;
+        };
+        const name = mk('sb-name', 'Скимитар', a.name, 'Название атаки');
+        const bonus = mk('sb-bonus', '+4', a.bonus ? (a.bonus > 0 ? '+' : '') + a.bonus : '', 'Бонус попадания');
+        const dmg = mk('sb-dmg', '1d6+2', a.damage, 'Урон (формула)');
+        name.addEventListener('change', () => { a.name = name.value; pushHistory(); });
+        bonus.addEventListener('change', () => { a.bonus = parseInt(bonus.value) || 0; pushHistory(); });
+        dmg.addEventListener('change', () => { a.damage = dmg.value.trim(); pushHistory(); });
+        const roll = document.createElement('button'); roll.className = 'sb-roll'; roll.textContent = '🎲'; roll.title = 'Бросить атаку и урон';
+        roll.addEventListener('click', () => rollAttack(t, a));
+        const del = document.createElement('button'); del.textContent = '✕'; del.title = 'Удалить атаку';
+        del.addEventListener('click', () => { t.attacks.splice(i, 1); renderStatBlockAttacks(t); pushHistory(); });
+        row.append(name, bonus, dmg, roll, del);
+        box.appendChild(row);
+    });
+}
+
+function initStatBlock() {
+    const target = () => { const loc = getCurrentLocation(); return loc && _propsTargetId ? loc.tokens.find(t => t.id === _propsTargetId) : null; };
+    const numField = (id, key) => document.getElementById(id).addEventListener('change', (e) => {
+        const t = target(); if (!t) return;
+        const n = parseInt(e.target.value);
+        if (Number.isFinite(n) && n >= 0) t[key] = n; else { delete t[key]; e.target.value = ''; }
+        pushHistory(); emit('canvas:redraw');
+    });
+    numField('prop-ac', 'ac'); numField('prop-speed', 'speed');
+    document.getElementById('sb-add-attack').addEventListener('click', () => {
+        const t = target(); if (!t) return;
+        if (!Array.isArray(t.attacks)) t.attacks = [];
+        t.attacks.push({ name: '', bonus: 0, damage: '' });
+        renderStatBlockAttacks(t); pushHistory();
+        const names = document.querySelectorAll('#sb-attacks .sb-name'); names[names.length - 1].focus();
+    });
 }
 
 // Map upload by button (drag & drop isn't available on tablets)
@@ -2835,7 +2943,8 @@ function broadcastState() {
         const sig = `${(t.src || '').length}`;
         const known = _sentSrc.get(String(t.id)) === sig;
         if (!known) _sentSrc.set(String(t.id), sig);
-        return { ...t, src: known ? undefined : t.src };
+        const { attacks, ac, ...pub } = t; // stat block stays with the DM
+        return { ...pub, src: known ? undefined : t.src };
     });
     const msg = {
         type: 'state', locId: loc.id, locName: loc.name, bgSig, tokens,
@@ -2893,6 +3002,7 @@ if (isPlayer) {
 initColorGrids();
 initDiceRoller();
 initPropsPanel();
+initStatBlock();
 renderLocations();
 renderLibrary();
 renderInitiative();
