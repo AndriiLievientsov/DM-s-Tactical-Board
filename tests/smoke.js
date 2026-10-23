@@ -16,6 +16,16 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(URL);
 
+  // First launch shows the help guide; closing it remembers that
+  assert.ok(await page.isVisible('#help-overlay'), 'help not shown on first launch');
+  assert.ok((await page.textContent('#help-keys')).includes('Стены и двери'));
+  await page.click('#help-close');
+  assert.ok(!(await page.isVisible('#help-overlay')), 'help did not close');
+  await page.keyboard.press('?');
+  assert.ok(await page.isVisible('#help-overlay'), '? does not open help');
+  await page.keyboard.press('Escape');
+  assert.ok(!(await page.isVisible('#help-overlay')), 'Esc does not close help');
+
   // XSS: location names must be escaped
   await page.evaluate((png) => {
     const loc = getCurrentLocation();
@@ -129,6 +139,139 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   assert.strictEqual(await page.evaluate(() => getCurrentLocation().walls.length), 2, 'wall not drawn by clicks');
   await page.keyboard.press('h');
 
+  // Group damage/healing: applies to all selected tokens, heal is capped, 0 HP = dead and skipped in initiative
+  const grp = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 81, src: png, x: 400, y: 100, radius: 25, name: 'Орк1', hp: 10, maxHp: 15, rotation: 0 },
+                  { id: 82, src: png, x: 450, y: 100, radius: 25, name: 'Орк2', hp: 4, maxHp: 15, rotation: 0 });
+    state.selectedTokenIds = new Set([81, 82]);
+    document.getElementById('btn-hp-group').click();
+    document.getElementById('hp-amount').value = '6';
+    document.getElementById('hp-dmg-btn').click();
+    const a = l.tokens.find(t => t.id === 81), b = l.tokens.find(t => t.id === 82);
+    const afterDmg = [a.hp, b.hp, isTokenDead(a), isTokenDead(b)];
+    state.selectedTokenIds = new Set([81]);
+    document.getElementById('hp-amount').value = '20';
+    document.getElementById('hp-heal-btn').click();
+    state.initiative = { combatants: [{ name: 'Орк1', init: 15, tokenRef: 81 }, { name: 'Орк2', init: 12, tokenRef: 82 }, { name: 'Маг', init: 5, tokenRef: 77 }], currentIndex: 0, round: 1 };
+    document.getElementById('init-next-btn').click();
+    const skipped = state.initiative.currentIndex;
+    state.selectedTokenIds = new Set(); state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    return { afterDmg, healed: a.hp, skipped };
+  }, PNG);
+  assert.deepStrictEqual(grp, { afterDmg: [4, 0, false, true], healed: 15, skipped: 2 });
+
+  // Movement: dragging shows distance; feet moved this turn add up and reset when the token's turn starts
+  const mv = await page.evaluate(() => {
+    state.isGridEnabled = true; state.gridType = 'square'; state.cellSize = 50;
+    const diag = moveDistanceFt({ x: 25, y: 25 }, { x: 125, y: 75 });   // 2 across, 1 down = 2 cells
+    return { diag };
+  });
+  assert.deepStrictEqual(mv, { diag: 10 });
+  await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 91, src: png, x: 50, y: 50, radius: 25, name: 'Воин', rotation: 0, speed: 30 });
+    state.initiative = { combatants: [{ name: 'Воин', init: 10, tokenRef: 91 }], currentIndex: 0, round: 1 };
+  }, PNG);
+  await page.keyboard.press('h');
+  const toScreen = (x, y) => page.evaluate(([x, y]) => { const r = canvas.getBoundingClientRect(); return { x: r.left + x * state.zoomLevel + state.offsetX, y: r.top + y * state.zoomLevel + state.offsetY }; }, [x, y]);
+  const drag = async (x1, y1, x2, y2) => {
+    const a = await toScreen(x1, y1), b = await toScreen(x2, y2);
+    await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 4 }); await page.mouse.up();
+  };
+  await drag(50, 50, 200, 50);   // 3 cells
+  await drag(200, 50, 200, 150); // 2 cells
+  const used = await page.evaluate(() => { const u = state.moveUsed[91]; document.getElementById('init-next-btn').click(); return [u, state.moveUsed[91]]; });
+  assert.deepStrictEqual(used, [25, undefined]);
+  await page.evaluate(() => { state.initiative = { combatants: [], currentIndex: -1, round: 1 }; });
+
+  // Token context menu: header shows stats, duplicate numbers the name, z-order moves the token
+  const menu = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 95, src: png, x: 600, y: 400, radius: 25, name: 'Гоблин', hp: 3, maxHp: 7, ac: 15, rotation: 0 });
+    state.menuTargetTokenIndex = l.tokens.length - 1;
+    fillTokenMenuHead(l.tokens[l.tokens.length - 1]);
+    const head = document.getElementById('token-menu-head').textContent;
+    const c1 = duplicateMenuToken();
+    state.menuTargetTokenIndex = l.tokens.indexOf(c1);
+    const c2 = duplicateMenuToken();
+    state.menuTargetTokenIndex = l.tokens.indexOf(c2);
+    document.querySelector('#token-menu [data-action="token-back"]').click();
+    const r = { head, names: [c1.name, c2.name], hp: c1.hp, back: l.tokens[0].id === c2.id };
+    l.tokens = l.tokens.filter(t => ![95, c1.id, c2.id].includes(t.id));
+    return r;
+  }, PNG);
+  assert.deepStrictEqual(menu, { head: 'Гоблин❤️ 3/7  ·  🛡 КД 15', names: ['Гоблин 2', 'Гоблин 3'], hp: 7, back: true });
+
+  // Layers: objects draw under creatures, can't be grabbed while locked, and skip initiative import
+  const lay = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 97, src: png, x: 700, y: 500, radius: 25, name: 'Сундук', rotation: 0 },
+                  { id: 98, src: png, x: 700, y: 500, radius: 25, name: 'Вор', rotation: 0 });
+    // the chest is last in the array, but on the object layer it goes under the thief
+    l.tokens.push(l.tokens.splice(l.tokens.findIndex(t => t.id === 97), 1)[0]);
+    openPropsForToken(97);
+    document.querySelector('#prop-layer [data-layer="object"]').click();
+    const ord = layerOrder(l.tokens), order = [ord[0].name, ord[ord.length - 1].name];
+    const sx = 700 * state.zoomLevel + state.offsetX, sy = 500 * state.zoomLevel + state.offsetY;
+    const top = l.tokens[tokenIndexAt(l, sx, sy, true)].name;
+    l.tokens = l.tokens.filter(t => t.id !== 98);
+    const lockedMiss = tokenIndexAt(l, sx, sy, true);
+    document.getElementById('btn-lock-objects').click();
+    const unlockedHit = l.tokens[tokenIndexAt(l, sx, sy, true)].name;
+    document.getElementById('btn-lock-objects').click();
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    document.getElementById('init-import-btn').click();
+    const inInit = state.initiative.combatants.some(c => c.tokenRef === 97);
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    l.tokens = l.tokens.filter(t => t.id !== 97);
+    return { order, top, lockedMiss, unlockedHit, inInit };
+  }, PNG);
+  assert.deepStrictEqual(lay, { order: ['Сундук', 'Вор'], top: 'Вор', lockedMiss: -1, unlockedHit: 'Сундук', inInit: false });
+
+  // Encounters: save selected tokens, place them again with numbered names and straight into initiative
+  const enc = await page.evaluate((png) => {
+    const l = getCurrentLocation();
+    l.tokens.push({ id: 201, src: png, x: 100, y: 300, radius: 25, name: 'Гоблин', hp: 2, maxHp: 7, rotation: 0 },
+                  { id: 202, src: png, x: 200, y: 300, radius: 25, name: 'Гоблин', hp: 7, maxHp: 7, rotation: 0 });
+    state.selectedTokenIds = new Set([201, 202]);
+    const e = saveEncounterFromSelection('Засада');
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 };
+    const placed = placeEncounter(e.id, true);
+    const r = {
+      saved: [e.tokens.length, e.tokens[0].hp, e.tokens[1].dx - e.tokens[0].dx],
+      names: placed.map(t => t.name), gap: placed[1].x - placed[0].x,
+      init: state.initiative.combatants.length, listed: document.querySelectorAll('#enc-list li').length,
+      kept: normalizeAdventure(state.adventureData).encounters.length,
+    };
+    l.tokens = l.tokens.filter(t => t.id !== 201 && t.id !== 202 && !placed.includes(t));
+    state.initiative = { combatants: [], currentIndex: -1, round: 1 }; state.selectedTokenIds = new Set();
+    return r;
+  }, PNG);
+  assert.deepStrictEqual(enc, { saved: [2, 7, 100], names: ['Гоблин 2', 'Гоблин 3'], gap: 100, init: 2, listed: 1, kept: 1 });
+
+  // Ambience: each location keeps its own sound; switching locations switches the sound while playing
+  const snd = await page.evaluate(() => {
+    const home = getCurrentLocation().id;
+    addLocation('Пещера');
+    const ids = [home, state.adventureData.locations[state.adventureData.locations.length - 1].id];
+    setCurrentLocationId(ids[0]);
+    const k = document.getElementById('sound-kind'); k.value = 'rain'; k.dispatchEvent(new Event('change'));
+    setCurrentLocationId(ids[1]);
+    k.value = 'cave'; k.dispatchEvent(new Event('change'));
+    document.getElementById('sound-play-btn').click();
+    const a = Ambience.activeKind;
+    setCurrentLocationId(ids[0]);
+    const b = Ambience.activeKind;
+    document.getElementById('sound-play-btn').click();
+    const c = Ambience.activeKind;
+    const kept = normalizeAdventure(state.adventureData).locations.map(l => l.sound);
+    state.adventureData.locations.forEach(l => { l.sound = ''; });
+    state.adventureData.locations = state.adventureData.locations.filter(l => l.id !== ids[1]);
+    return { a, b, c, kept: kept.slice(0, 2), btn: document.getElementById('sound-play-btn').textContent };
+  });
+  assert.deepStrictEqual(snd, { a: 'cave', b: 'rain', c: '', kept: ['rain', 'cave'], btn: '▶ Играть' });
+
   // Autosave + recovery slot
   await page.evaluate(() => { state.adventureData.notes = 'secret'; markDirty(); });
   await page.waitForTimeout(2600);
@@ -152,6 +295,26 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
   await page.evaluate(() => { const l = getCurrentLocation(); l.walls = [{ id: 5, points: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }]; l.lighting = 'dark'; drawCanvas(); });
   await p2.waitForTimeout(400);
   assert.deepStrictEqual(await p2.evaluate(() => [getCurrentLocation().walls.length, getCurrentLocation().lighting]), [1, 'dark']);
+  // Hidden tokens stay on the DM's map but never reach the player window; the menu toggles them back
+  await page.evaluate(() => {
+    const l = getCurrentLocation();
+    state.menuTargetTokenIndex = l.tokens.findIndex(t => t.id === 9);
+    fillTokenMenuHead(l.tokens[state.menuTargetTokenIndex]);
+    document.querySelector('#token-menu [data-action="toggle-hidden"]').click();
+  });
+  await p2.waitForTimeout(400);
+  assert.deepStrictEqual(await p2.evaluate(() => getCurrentLocation().tokens.length), 0, 'hidden token reached players');
+  await page.evaluate(() => { openPropsForToken(9); const c = document.getElementById('prop-hidden'); c.checked = false; c.dispatchEvent(new Event('change')); });
+  await p2.waitForTimeout(400);
+  assert.deepStrictEqual(await p2.evaluate(() => getCurrentLocation().tokens.length), 1, 'unhidden token missing for players');
+  // Dice rolls reach the player window only when sharing is on
+  await page.evaluate(() => recordRoll('secret', 13, ''));
+  await p2.waitForTimeout(300);
+  assert.ok(!(await p2.evaluate(() => document.getElementById('player-roll').classList.contains('show'))), 'unshared roll shown to players');
+  await page.evaluate(() => { const c = document.getElementById('dice-share'); c.checked = true; c.dispatchEvent(new Event('change')); recordRoll('d20', 17, 'd20:[17]=17'); });
+  await p2.waitForTimeout(300);
+  assert.deepStrictEqual(await p2.evaluate(() => [document.getElementById('player-roll').classList.contains('show'), document.querySelector('#player-roll .pr-total').textContent]), [true, '17']);
+  await page.evaluate(() => { const c = document.getElementById('dice-share'); c.checked = false; c.dispatchEvent(new Event('change')); });
 
   // Pinch zoom
   const cdp = await ctx.newCDPSession(page);
